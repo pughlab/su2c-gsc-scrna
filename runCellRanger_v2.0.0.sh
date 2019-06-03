@@ -1,11 +1,12 @@
+### Run Cell Ranger (v2.0.0) on 10X Genomics fastqs
+### L.Richards
+### $1 is the sample prefix
+### $2 is the prefex on the fastq
+### Example Usage on Mordor: qsub -q highmem.q runCellRanger_v2.0.0.sh BT127_L BT127
+
 #!/bin/bash
 #
 #$ -cwd
-
-
-#####$1 is the sample prefix
-#####$2 is the prefex on the fastq
-##### Example Usage on Mordor: qsub -q highmem.q runCellRanger_v2.0.0.sh BT127_L BT127
 
 mkdir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/data/CellRanger_v2.0.0/$1
 cd /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/data/CellRanger_v2.0.0/$1
