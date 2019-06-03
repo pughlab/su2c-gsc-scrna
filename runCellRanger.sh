@@ -5,9 +5,10 @@
 
 #####$1 is the sample prefix
 #####$2 is the prefex on the fastq
+##### Example Usage on Mordor: qsub -q highmem.q runCellRanger_v2.0.0.sh BT127_L BT127
 
-mkdir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/data/CellRanger_v2.1.0/$1
-cd /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/data/CellRanger_v2.1.0/$1
+mkdir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/data/CellRanger_v2.0.0/$1
+cd /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/data/CellRanger_v2.0.0/$1
 
 CELLRANGER_ROOT='/mnt/work1/users/pughlab/bin/CellRanger/v2.0/cellranger-2.0.0/cellranger'
 TOOL='count'
