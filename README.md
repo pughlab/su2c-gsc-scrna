@@ -17,6 +17,10 @@ SeuratPreprocessing.R
 
 ##  2.0 Figures
 
+Figures for this Manuscript can be access on google drive under the folder:
+
+
+
 ##  3.0 Data
 
 To easily access and query single cell data related to this study, we have uploaded data to the Broad Single Cell Portal.   
