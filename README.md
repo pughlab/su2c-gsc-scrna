@@ -2,10 +2,15 @@
 L.Richards  
 Pugh Lab  
 June 2019  
+
+Cohort Overview:   
+XX cells from 29 BTSC culturers, derived from XX patients.     
+XX cells from XX primary GBM from XX patients.   
+X samples have matched BTSC culture and primary GBM.   
   
 Manuscript:   
 https://docs.google.com/document/d/1qLlc83DX5s8qPE3pJI2Rfcaq0i0Zkn0_2sxnk3msaGY/edit?usp=sharing  
-  
+ 
 ##  1.0 Scripts
 
 runCellRanger.sh  
