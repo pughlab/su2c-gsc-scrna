@@ -5,7 +5,7 @@ June 2019
 
 **Cohort Overview:**  
 XX cells from 29 BTSC culturers, derived from XX patients.     
-XX cells from XX primary GBM from XX patients.   
+XX cells from 24 primary GBM samples from 7 patients (some tumours have multiple regions/sample)  
 X samples have matched BTSC culture and primary GBM.   
   
 **Manuscript:**   
