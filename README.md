@@ -2,7 +2,8 @@
 L.Richards  
 Pugh Lab  
 June 2019  
-https://docs.google.com/document/d/1qLlc83DX5s8qPE3pJI2Rfcaq0i0Zkn0_2sxnk3msaGY/edit?usp=sharing
+  
+Manuscript: https://docs.google.com/document/d/1qLlc83DX5s8qPE3pJI2Rfcaq0i0Zkn0_2sxnk3msaGY/edit?usp=sharing
 
 ##  1.0 Scripts
 
