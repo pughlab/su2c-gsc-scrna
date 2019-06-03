@@ -6,10 +6,14 @@ June 2019
 ##  1.0 Scripts
 
 runCellRanger.sh  
-runBamTagHistogram.sh  
-Dropbead.R  
-QC.R  
-SeuratPreprocessing.R  
+> Run CellRanger   
+  
+runBamTagHistogram.sh    
+>     
+
+Dropbead.R    
+QC.R    
+SeuratPreprocessing.R    
 
 ##  2.0 Figures
 
