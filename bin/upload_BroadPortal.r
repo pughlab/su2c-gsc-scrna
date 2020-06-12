@@ -2,7 +2,7 @@
 #            Generate files for upload to Broad           #
 #                        scRNA portal                     #
 #                         L.Richards                      #
-#                         April 2020                      #
+#                         June 2020                       #
 ###########################################################
 
 ###########################################################
@@ -211,10 +211,6 @@ if(tsne == TRUE){
             #col.names = TRUE
             )
 }
-
-
-
-
 
 
 
