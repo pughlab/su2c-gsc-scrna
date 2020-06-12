@@ -18,7 +18,10 @@ https://drive.google.com/open?id=1o8pcIJsZ3Znnoy2uowlab0VcohdVvrVp
 **Contact:**  
 Laura Richards (lauram.richards@mail.utoronto.ca) and Trevor J. Pugh (trevor.pugh@utoronto.ca)  
    
+**Browse the data:**
+Link to BroadPortal
 
-
+**Download raw data:**
+[Link to EGA]
 
 
