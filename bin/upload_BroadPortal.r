@@ -23,14 +23,11 @@
 ###
 ###########################################################
 
-#load old version of seurat
-suppressMessages(library("Seurat",
-                         lib ="/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/bin/")
-                )
-library("optparse")
-library("data.table")
-library("dplyr")
-library("taRifx")
+library(Seurat)
+library(optparse)
+library(data.table)
+library(dplyr)
+library(taRifx)
 
 ###########################################################
 ### USER DEFINE VARIABLES
@@ -43,7 +40,15 @@ seurat.obj <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607
 out.name <- "SU2C_scRNA_TumourOnly"
 
 #path to text file with names of metadata columns to include
-#meta.columns <-
+#each column name on own line
+#if "ALL", use all columns in metadatafile
+meta.columns <- "ALL"
+
+#extract tSNE Coordinates
+tsne <- FALSE
+
+#extract UMAP Coordinates
+umap <- TRUE
 
 
 
@@ -65,7 +70,7 @@ load_obj <- function(f)
 }
 
 dat <- load_obj(seurat.obj)
-
+dat <- UpdateSeuratObject(dat) #update if v2, check structure if v3
 
 ###########################################################
 ### 2) Extract normalized expression
@@ -77,21 +82,21 @@ print(Sys.time())
 print("***************************")
 
 print("Size of expression matrix....")
-print(dim(dat@data))
+print(dim(dat@assays$RNA@data))
 
 print("Extracting normalized expression matrix...")
-norm.exp <- data.frame(as.matrix(dat@data))
+norm.exp <- data.frame(as.matrix(dat@assays$RNA@data))
 norm.exp <- tibble::rownames_to_column(norm.exp, "GENE")
 print(norm.exp[1:5, 1:5])
 
 file1 <- paste0(out.name, "_NormalizedExpression.txt")
 print(paste0("Writing out expression matrix...", file1))
 write.table(norm.exp,
-          file=file1,
-          row.names = FALSE,
-          quote = FALSE,
+            file=file1,
+            row.names = FALSE,
+            quote = FALSE,
             sep = "\t"
-          )    
+          )
 
 
 ###########################################################
@@ -107,38 +112,129 @@ print("Extract Metadata matrix...")
 meta <- data.frame(dat@meta.data)
 meta <- remove.factors(meta)
 
-meta$Patient.ID <- gsub("_L", "", meta$orig.ident)
-meta$Sample.Type <- ifelse(grep("_L", meta$orig.ident), "GSC", "TUMOUR")
+if(meta.columns == "ALL"){
+
+  include <- colnames(meta)
+  print("Using all columns in metadata...")
+  print(cat(include ,sep = "\n"))
 
 
-## define columns to keep in
-include <- c("orig.ident",
-             "Patient.ID",
-             "Sample.Type",
-             "nGene",
-             "nUMI",
-             "percent.mito",
-             "Phase",
-             "G2M.Score",
-             "Cluster.ID",
-             "Opt.Resolution"
-            )
+} else if (grepl(".txt", meta.columns)){
+
+  include <- readLines(meta.columns)
+  print("Using pre-specified set of metadata columns...")
+  print(cat(include ,sep = "\n"))
+
+}
+
+#subset metadata matrix
 meta <- meta[, include]
-colnames(meta)[c(1,10)] <- c("Sample.ID", "Optimal.Clustering.Resolution")
+print(dim(meta))
+
+##format cluster column to be group
+## search "res." which is seurat default
+cluster.idx <- grep("^res\\.", colnames(meta))
+colnames(meta)[cluster.idx] <- paste0("Cluster_", colnames(meta)[cluster.idx])
+meta[ ,cluster.idx] <- paste0("C", meta[ ,cluster.idx])
 
 
+print("Formatting...")
+#format for Broad Guidelines
 classes <- as.vector(unlist(lapply(meta, class)))
 TYPE <- c("TYPE", ifelse(classes == "numeric", "numeric", "group"))
 meta <- data.frame(setDT(meta, keep.rownames = "NAME"))
 meta <- rbind(TYPE, meta)
 
-file2 <- paste0(sample, "_MetaData.txt")
-print(file2)
-
+file2 <- paste0(out.name, "_MetaData.txt")
+print(paste0("Writing out metadata...", file2))
 write.table(meta,
-          file=file2,
+          file = file2,
           row.names = FALSE,
           quote = FALSE,
           sep = "\t",
           col.names = TRUE
           )
+
+###########################################################
+### 4) Extract cluster information
+###########################################################
+print("")
+print("***************************")
+print("Cluster Coordinates")
+print(Sys.time())
+print("***************************")
+
+if(umap == TRUE){
+
+  print("Extract UMAP Coordinates....")
+  umap.coords <- as.data.frame(dat@reductions$umap@cell.embeddings)
+  colnames(umap.coords) <- c("X", "Y")
+  umap.coords <- remove.factors(umap.coords)
+
+  classes <- as.vector(unlist(lapply(umap.coords , class)))
+  TYPE <- c("TYPE", ifelse(classes == "numeric", "numeric", "group"))
+  umap.coords  <- data.frame(setDT(umap.coords , keep.rownames = "NAME"))
+  umap.coords  <- rbind(TYPE, umap.coords)
+
+  file3 <- paste0(out.name, "_UMAP_ClusterCoordinates.txt")
+  print(paste0("Writing out UMAP Coordinates....", file3))
+
+  write.table(umap.coords,
+            file=file3,
+            row.names = FALSE,
+            quote = FALSE,
+             sep = "\t",
+            #col.names = TRUE
+            )
+}
+
+if(tsne == TRUE){
+
+  print("Extract tSNE Coordinates....")
+  tsne.coords <- as.data.frame(dat@reductions$tsne@cell.embeddings)
+  colnames(tsne.coords) <- c("X", "Y")
+  tsne.coords <- remove.factors(tsne.coords)
+
+  classes <- as.vector(unlist(lapply(tsne.coords , class)))
+  TYPE <- c("TYPE", ifelse(classes == "numeric", "numeric", "group"))
+  tsne.coords  <- data.frame(setDT(tsne.coords , keep.rownames = "NAME"))
+  tsne.coords  <- rbind(TYPE, tsne.coords)
+
+  file3 <- paste0(out.name, "_tSNE_ClusterCoordinates.txt")
+  print(paste0("Writing out tSNE Coordinates....", file3))
+
+  write.table(tsne.coords,
+            file=file3,
+            row.names = FALSE,
+            quote = FALSE,
+             sep = "\t",
+            #col.names = TRUE
+            )
+}
+
+
+
+
+
+
+
+#######################################################
+### EXAMPLE: PUSH FILES TO PORTAL VIA GOOGLE CLOUD
+###
+### 1) make sure you are on the interactive build parition on H4H
+### salloc -c 1 -t 1:0:0 --mem 5G -p build
+###
+### 2) move to where the tool is located
+### cd /cluster/home/lrichard/yea
+###
+### 3) Make sure files to trasnfer are in home dir
+### cp filename /cluster/home/lrichard/Broad_scRNA_Uploads/
+###
+### 4) login to google cloud
+### gcloud init
+###
+### 5) copy file to bucket # (located on your portal study page)
+### gsutil cp /cluster/home/lrichard/Broad_scRNA_Uploads/SU2C_scRNA/* gs://fc-dc9e0b19-ec18-47ca-9e6c-ae13ac5e1889
+###
+### 6) login to Broad single cell portal wbstire and sync study
+#######################################################
