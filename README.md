@@ -16,7 +16,7 @@ Figures for this manuscript can be accessed on google drive:
 https://drive.google.com/open?id=1o8pcIJsZ3Znnoy2uowlab0VcohdVvrVp
 
 **Contact:**  
-Laura Richards (lauram.richards@mail.utoronto.ca) and Trevor J. Pugh (trevor.pugh@utoronto.ca)  
+Laura Richards (lauram.richards@mail.utoronto.ca) & Trevor Pugh (trevor.pugh@utoronto.ca)  
    
 **Browse the data:**
 Link to BroadPortal
