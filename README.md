@@ -1,7 +1,12 @@
-# Single-cell Analysis for SU2C Transcriptomics Manuscript
-L.Richards  
-Pugh Lab  
-June 2019  
+## Gradient of developmental and injury-response transcriptional states defines roots of glioblastoma heterogeneity
+
+*Laura M. Richards, Owen Whitley, Graham MacLeod, Florence M.G. Cavalli, Fiona J. Coutinho , Michelle Kushida, Nataliia Svergun, Danielle Croucher, Kenny Yu, Naghmeh Rastegar, Moloud Ahmadi, Danielle A. Bozek, Julia E. Jaramillo, Naijin Li, Erika Luis, Nicole I. Park, Julian Spears, Michael D. Cusimano, Benjamin Haibe-Kains, H. Artee Luchman, Samuel Weiss, Stephane Angers, Peter B. Dirks, Gary D. Bader, Trevor J. Pugh*
+
+Glioblastomas (GBM) harbour diverse populations of cells, including a rare subpopulation of glioblastoma stem cells (GSCs) that drive tumorigenesis. To characterize functional diversity within the tumor-initiating fraction of GBM, we performed single-cell RNA-sequencing on >69,000 GSCs cultured from the tumors of 26 patients. We observed a high degree of inter- and intra-GSC transcriptional heterogeneity that could not be fully explained by somatic alterations at the DNA level. Instead, we found GSCs mapped along a  transcriptional gradient spanning two cellular states reminiscent of normal neural developmental and inflammatory wound response processes. Genome-wide CRISPR/Cas9 drop-out screens recapitulated this observation, as essential genes within each GSC comprised a mixture of these states depending on the position along this axis as measured by gene expression profiling. Further single-cell RNA-sequencing of patient tumors found the majority of cancer cells organize along an astrocyte maturation gradient orthogonal to the GSC gradient yet retained expression of founder transcriptional programs found in GSCs. Our work supports a model whereby GBM heterogeneity is rooted in a fundamental GSC-based neural tissue regeneration and wound response transcriptional continuum.
+
+***
+
+
 
 **Cohort Overview:**  
 XX cells from 29 BTSC culturers, derived from XX patients.     
