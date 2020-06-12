@@ -15,6 +15,13 @@ https://docs.google.com/document/d/1qLlc83DX5s8qPE3pJI2Rfcaq0i0Zkn0_2sxnk3msaGY/
 Figures for this manuscript can be accessed on google drive:
 https://drive.google.com/open?id=1o8pcIJsZ3Znnoy2uowlab0VcohdVvrVp
 
+**Contact:**
+Laura Richards
+lauram.richards@mail.utoronto.ca
+
+Trevor J. Pugh
+trevor.pugh@utoronto.ca
+
 ***   
 
 
