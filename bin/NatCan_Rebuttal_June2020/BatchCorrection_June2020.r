@@ -76,7 +76,8 @@ dev.off()
 ### 3.1) split up by sample
 BTSC.panel <- SplitObject(BTSC, split.by = "SampleID")
 
-### 3.2) re-processs each sample### we want to mimic the preporcessing to be as close to ours as possible
+### 3.2) re-processs each sample
+### we want to mimic the preporcessing to be as close to ours as possible
 ### run PCA on all genes except ribosomal
 ### regress out CC.difference, nUMI and percent.mito
 for (i in 1:length(BTSC.panel)){
@@ -101,6 +102,7 @@ BTSC.con <- Conos$new(BTSC.panel)
 
 ### 3.4) Build Graph with PCA space
 ### There are other options but PCA is default
+### This step is very slow.....
 ### "Next we will build the joint graph that encompasses all the samples. We do
 ### that by pairwise projecting samples onto a common space and establishing
 ### kNN of mNN pairs between the samples. We then append within-sample kNN #
@@ -110,7 +112,7 @@ BTSC.con$buildGraph(k = 15,
                     k.self = 5,
                     space = "PCA",
                     ncomps = 30,  ### 30  for global dataset to match original processing
-                    n.odgenes = 2000,
+                    n.odgenes = 2000, ### over dispersed genes
                     matching.method = "mNN",
                     metric = "angular",
                     score.component.variance = TRUE,
@@ -118,23 +120,34 @@ BTSC.con$buildGraph(k = 15,
                   )
 
 ### 3.5) Identify global clusters
+### Can also cluster with different methods
+### use default resolution of 1
 BTSC.con$findCommunities(method=leiden.community, resolution=1)
 
 ### 3.6) Embed graph
-BTSC.con$embedGraph()
+### options are LargeVis or umap
+### LargeVis is default, but use umap to be consistent with original processing
+### use same min.dist and spread as Seurat defaults
+### both seurat and CONOS implement UMAP with uwot package
+BTSC.con$embedGraph(method = "UMAP", min.dist = 0.3, spread = 1)
 
 ### 3.7) Convert conos object back to seurat object
 BTSC.conos <- as.Seurat(BTSC.con)
+#ident is conos clusters
 
 ### 3.8) Plot results
-DimPlot(ifnb,
-        reduction = "largeVis",
-        group.by = c("stim", "ident", "seurat_annotations"),
-        ncol = 3
+pdf("CONOS_GSC_umaps.pdf", height = 7, width = 18)
+DimPlot(BTSC.conos,
+        reduction = "UMAP",
+        group.by = c("SampleID", "ident"),
+        ncol = 2
       )
+dev.off()
 
-#fraction of samples in each cluster
-plotClusterBarplots(con, legend.height = 0.1)
+### fraction of samples in each cluster
+pdf("CONOS_GSC_fractionSamples.pdf", height = 18, width = 18)
+plotClusterBarplots(BTSC.con, legend.height = 0.1)
+dev.off()
 
 ### 3.9) Save results
 saveRDS(BTSC.con, file = "Global_SU2C_GSCs_CONOS.rds")
@@ -146,6 +159,113 @@ saveRDS(BTSC.panel, file = "Global_SU2C_GSCs_Seurat_samplePanel.rds")
 #########################################
 # 4) Run LIGER
 #########################################
-
 ### Ref: http://htmlpreview.github.io/?https://github.com/satijalab/seurat-wrappers/blob/master/docs/liger.html
 ### https://github.com/MacoskoLab/liger
+
+library(liger)
+
+### load GSC data and update to seurat v3 object
+load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata")
+BTSC <- UpdateSeuratObject(BTSC)
+
+### 4.1) Scale data within each sample
+### Regress out sample factors as original analysis
+BTSC.liger <- ScaleData(BTSC,
+                        split.by = "SampleID",
+                        do.center = FALSE,
+                        vars.to.regress = c("CC.Difference", "nCount_RNA", "percent.mito"),
+                         verbose = T
+                      )
+
+### 4.2) Joint Matrix Factorization (very time consuming)
+### lambda = larger values penalize dataset-specific effects more strongly (ie.
+### alignment should increase as lambda increases). Default is 5.
+BTSC.liger <- RunOptimizeALS(BTSC.liger,
+                              k = 20,
+                              lambda = 5, #default value, effects alignemnt
+                              split.by = "SampleID"
+                            )
+saveRDS(BTSC.liger, file = "Global_SU2C_GSCs_Seurat_LIGER.rds")
+### 4.3)  Quantile Normalization and Joint Clustering
+### This step concerns me because of the ref_dataset paramter use in cancer
+### "Name of dataset to use as a "reference" for normalization.By default, the dataset with the largest number of cells is used."
+### It does not seem appropiate to use the largest GSC dataset as the refernece ### since we know they have different transcriptomic and genetic properties
+BTSC.liger <- RunQuantileNorm(BTSC.liger,
+                              split.by = "SampleID",
+                              ref_datset = NULL
+                            )
+
+### 4.4) FindNeighbours using NMF from last step
+BTSC.liger <- FindNeighbors(BTSC.liger,
+                            reduction = "iNMF",
+                            dims = 1:30
+                          )
+### 4.5) Find Clusters
+BTSC.liger <- FindClusters(BTSC.liger,
+                            resolution = 2 #use same resolution to match original protocol
+                          )
+
+### 4.6) Dimensional reduction wiht UMAP
+BTSC.liger <- RunUMAP(BTSC.liger,
+                      dims = 1:ncol(BTSC.liger[["iNMF"]]),
+                      reduction = "iNMF"
+                    )
+
+### 4.7) Plotting
+DimPlot(pbmcsca, group.by = c("Method", "ident", "CellType"), ncol = 3)
+
+### 4.8) Save Data
+saveRDS(BTSC.liger, file = "Global_SU2C_GSCs_Seurat_LIGER.rds")
+
+
+
+
+#########################################
+# 5) Run fastMNN
+#########################################
+
+### Ref: http://htmlpreview.github.io/?https://github.com/satijalab/seurat-wrappers/blob/master/docs/fast_mnn.html
+### https://bioconductor.org/packages/release/bioc/html/batchelor.html
+
+
+
+
+#########################################
+# 6) Run Batchelor package options
+#########################################
+
+### Ref: http://htmlpreview.github.io/?https://github.com/satijalab/seurat-wrappers/blob/master/docs/fast_mnn.html
+### https://bioconductor.org/packages/release/bioc/html/batchelor.html
+
+
+##########################
+# 6.1) fastMNN
+##########################
+### already run above with seurat wrapper
+
+##########################
+# 6.2) Batch rescaling
+##########################
+### While this method is fast and simple, it makes the strong assumption that
+### the population composition of each batch is the same. This is usually not
+### the case for scRNA-seq experiments in real systems that exhibit biological
+### variation. Thus, rescaleBatches() is best suited for merging technical
+### replicates of the same sample, e.g., that have been sequenced separately.
+
+
+
+
+##########################
+# 6.3) Multi-batch Normalization
+##########################
+### Differences in sequencing depth between batches are an obvious cause for
+### batch-to-batch differences. These can be removed by multiBatchNorm(), which
+### downscales all batches to match the coverage of the least-sequenced batch.
+### This function returns a list of SingleCellExperiment objects with log-
+### transformed normalized expression values that can be directly used for
+### further correction.
+
+
+##########################
+# 6.4) Multi-batch PCA
+##########################
