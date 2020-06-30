@@ -255,6 +255,7 @@ saveRDS(BTSC.liger, file = "Global_SU2C_GSCs_Seurat_LIGER.rds")
 ##############################################################
 ### Ref: http://htmlpreview.github.io/?https://github.com/satijalab/seurat-wrappers/blob/master/docs/fast_mnn.html
 ### https://bioconductor.org/packages/release/bioc/html/batchelor.html
+### corrects PCA scores
 
 ### Load GSC data and update to v3
 load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata")
@@ -291,8 +292,7 @@ saveRDS(BTSC_fMNN, file = "Global_SU2C_GSCs_Seurat_fastMNN.rds")
 # 6) Run Batchelor package options (future option)
 ##############################################################
 
-### Ref: http://htmlpreview.github.io/?https://github.com/satijalab/seurat-wrappers/blob/master/docs/fast_mnn.html
-### https://bioconductor.org/packages/release/bioc/html/batchelor.html
+### Ref: https://bioconductor.org/packages/release/bioc/html/batchelor.html
 
 
 ##########################
@@ -301,7 +301,7 @@ saveRDS(BTSC_fMNN, file = "Global_SU2C_GSCs_Seurat_fastMNN.rds")
 ### already run above with seurat wrapper
 
 ##########################
-# 6.2) Batch rescaling
+# 6.2) Batch rescaling (do not use but reference in paper)
 ##########################
 ### While this method is fast and simple, it makes the strong assumption that
 ### the population composition of each batch is the same. This is usually not
@@ -336,7 +336,6 @@ saveRDS(BTSC_fMNN, file = "Global_SU2C_GSCs_Seurat_fastMNN.rds")
 ### 7.2) Format CONOS
 ### 7.3) Format LIGER
 ### 7.4) Format fastMNN
-### 4.5) Format
 
 ### subset out meta.data
 LIGER_meta <- BTSC.liger@meta.data
