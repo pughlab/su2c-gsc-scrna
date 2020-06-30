@@ -16,6 +16,7 @@
 ##############################################################
 
 
+
 ##############################################################
 # 1) Install + Load packages
 ##############################################################
@@ -29,6 +30,9 @@ library(Seurat) #v3.1.5
 library(SeuratWrappers) #v0.2.0
 library(conos) #v1.3.0
 library(liger) #v0.5.0
+library(batchelor) #v1.2.4 (used in fastMNN seurat wrapper)
+
+
 
 ##############################################################
 # 2) Load GSC object + plot original clustering
@@ -64,7 +68,6 @@ DimPlot(BTSC,
 
 dev.off()
 
-### Plot default tSNE with current paper parameters
 
 
 
@@ -257,6 +260,30 @@ saveRDS(BTSC.liger, file = "Global_SU2C_GSCs_Seurat_LIGER.rds")
 load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata")
 BTSC <- UpdateSeuratObject(BTSC)
 
+### 5.1) Run fastMNN
+### computes 2000 integration features
+BTSC_fMNN <- RunFastMNN(object.list = SplitObject(BTSC, split.by = "SampleID"))
+
+### 5.2) UMAP reduction
+BTSC_fMNN <- RunUMAP(BTSC_fMNN, reduction = "mnn", dims = 1:30)
+
+### 5.3) Cluster
+BTSC_fMNN <- FindNeighbors(BTSC_fMNN, reduction = "mnn", dims = 1:30)
+BTSC_fMNN <- FindClusters(BTSC_fMNN, resolution = 2)
+
+### 5.4) Plot
+pdf("fastMNN_res.2.pdf", height = 7, width = 18)
+DimPlot(BTSC_fMNN,
+        group.by = c("SampleID", "ident"),
+        ncol = 2,
+        reduction = "umap",
+        pt.size = 0.1,
+        label = TRUE
+      ) + NoLegend()
+dev.off()
+
+### 5.5) Save data
+saveRDS(BTSC_fMNN, file = "Global_SU2C_GSCs_Seurat_fastMNN.rds")
 
 
 
