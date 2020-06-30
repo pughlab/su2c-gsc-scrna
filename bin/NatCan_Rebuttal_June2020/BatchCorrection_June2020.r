@@ -1,23 +1,24 @@
-###########################################################
-#             Run Batch Correction Tools on GSCs          #
-#                         L.Richards                      #
-#                         June 2020                       #
-###########################################################
+##############################################################
+#             Run Batch Correction Tools on GSCs             #
+#                         L.Richards                         #
+#                         June 2020                          #
+##############################################################
 ### Reference: https://github.com/satijalab/seurat-wrappers
 ### Working dir: /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/BatchCorrection/
 
-###########################################################
+
+##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
 ### 1) Load Global GSC data (corresponds to Ext Data Fig 4.)
 ### 2) Run CONOS wrapper in Seurat
 ### 3) Run LIGER in Seurat
 ### 4) Run fastMNN in Seurat
-###########################################################
+##############################################################
 
 
-#########################################
+##############################################################
 # 1) Install + Load packages
-#########################################
+##############################################################
 #library(devtools)
 #devtools::install_github("RcppCore/Rcpp")
 #devtools::install_github("satijalab/seurat-wrappers")
@@ -27,11 +28,11 @@
 library(Seurat) #v3.1.5
 library(SeuratWrappers) #v0.2.0
 library(conos) #v1.3.0
-library(liger)
+library(liger) #v0.5.0
 
-#########################################
-# 2) Load GSC object
-#########################################
+##############################################################
+# 2) Load GSC object + plot original clustering
+##############################################################
 
 ### file copied from /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/data/SeuratObj/BTSCs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata to H4H
 load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata")
@@ -66,10 +67,10 @@ dev.off()
 ### Plot default tSNE with current paper parameters
 
 
-#########################################
-# 3) Run CONOS
-#########################################
 
+##############################################################
+# 3) Run CONOS
+##############################################################
 ### Ref: http://htmlpreview.github.io/?https://github.com/satijalab/seurat-wrappers/blob/master/docs/conos.html
 ### https://github.com/hms-dbmi/conos
 
@@ -126,22 +127,27 @@ BTSC.con$findCommunities(method=leiden.community, resolution=1)
 
 ### 3.6) Embed graph
 ### options are LargeVis or umap
-### LargeVis is default, but use umap to be consistent with original processing
+### LargeVis is default, but using umap to be consistent with
+### original processing in paper
 ### use same min.dist and spread as Seurat defaults
 ### both seurat and CONOS implement UMAP with uwot package
 BTSC.con$embedGraph(method = "UMAP", min.dist = 0.3, spread = 1)
 
 ### 3.7) Convert conos object back to seurat object
-BTSC.conos <- as.Seurat(BTSC.con)
-#ident is conos clusters
+### ident is conos clusters
+BTSC.conos <- as.Seurat(BTSC.con, reduction = "UMAP")
 
 ### 3.8) Plot results
 pdf("CONOS_GSC_umaps.pdf", height = 7, width = 18)
+
 DimPlot(BTSC.conos,
+        group.by = c("SampleID", "leiden"),
+        ncol = 2,
         reduction = "UMAP",
-        group.by = c("SampleID", "ident"),
-        ncol = 2
-      )
+        pt.size = 0.1,
+        label = TRUE
+        ) + NoLegend()
+
 dev.off()
 
 ### fraction of samples in each cluster
@@ -156,17 +162,11 @@ saveRDS(BTSC.panel, file = "Global_SU2C_GSCs_Seurat_samplePanel.rds")
 
 
 
-#########################################
+##############################################################
 # 4) Run LIGER
-#########################################
+##############################################################
 ### Ref: http://htmlpreview.github.io/?https://github.com/satijalab/seurat-wrappers/blob/master/docs/liger.html
 ### https://github.com/MacoskoLab/liger
-
-library(liger)
-
-### load GSC data and update to seurat v3 object
-load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata")
-BTSC <- UpdateSeuratObject(BTSC)
 
 ### 4.1) Scale data within each sample
 ### Regress out sample factors as original analysis
@@ -177,7 +177,7 @@ BTSC.liger <- ScaleData(BTSC,
                          verbose = T
                       )
 
-### 4.2) Joint Matrix Factorization (very time consuming)
+### 4.2) Joint Matrix Factorization (very time consuming ~1h)
 ### lambda = larger values penalize dataset-specific effects more strongly (ie.
 ### alignment should increase as lambda increases). Default is 5.
 BTSC.liger <- RunOptimizeALS(BTSC.liger,
@@ -185,54 +185,84 @@ BTSC.liger <- RunOptimizeALS(BTSC.liger,
                               lambda = 5, #default value, effects alignemnt
                               split.by = "SampleID"
                             )
-saveRDS(BTSC.liger, file = "Global_SU2C_GSCs_Seurat_LIGER.rds")
+#saveRDS(BTSC.liger, file = "Global_SU2C_GSCs_Seurat_LIGER.rds")
+
 ### 4.3)  Quantile Normalization and Joint Clustering
 ### This step concerns me because of the ref_dataset paramter use in cancer
 ### "Name of dataset to use as a "reference" for normalization.By default, the dataset with the largest number of cells is used."
 ### It does not seem appropiate to use the largest GSC dataset as the refernece ### since we know they have different transcriptomic and genetic properties
+### "clusters" metadata
 BTSC.liger <- RunQuantileNorm(BTSC.liger,
                               split.by = "SampleID",
                               ref_datset = NULL
-                            )
+                              )
 
 ### 4.4) FindNeighbours using NMF from last step
 BTSC.liger <- FindNeighbors(BTSC.liger,
                             reduction = "iNMF",
-                            dims = 1:30
+                            dims = 1:20
                           )
 ### 4.5) Find Clusters
+### "seurat_clusters" in meta.data
 BTSC.liger <- FindClusters(BTSC.liger,
                             resolution = 2 #use same resolution to match original protocol
                           )
 
-### 4.6) Dimensional reduction wiht UMAP
+### 4.6) Dimensional reduction with UMAP
 BTSC.liger <- RunUMAP(BTSC.liger,
                       dims = 1:ncol(BTSC.liger[["iNMF"]]),
                       reduction = "iNMF"
                     )
 
 ### 4.7) Plotting
-DimPlot(pbmcsca, group.by = c("Method", "ident", "CellType"), ncol = 3)
+pdf("LIGER_res.2.pdf", height = 7, width = 18)
+
+DimPlot(BTSC.liger,
+        group.by = c("SampleID", "clusters"),
+        ncol = 2,
+        reduction = "umap",
+        pt.size = 0.1,
+        label = TRUE
+      ) + NoLegend()
+
+DimPlot(BTSC.liger,
+              group.by = c("SampleID", "seurat_clusters"),
+              ncol = 2,
+              reduction = "umap",
+              pt.size = 0.1,
+              label = TRUE
+            ) + NoLegend()
+
+            DimPlot(BTSC.liger,
+                          group.by = c("SampleID", "seurat_clusters"),
+                          ncol = 2,
+                          reduction = "umap",
+                          pt.size = 0.1,
+                          label = FALSE
+                        ) + NoLegend()
+dev.off()
 
 ### 4.8) Save Data
 saveRDS(BTSC.liger, file = "Global_SU2C_GSCs_Seurat_LIGER.rds")
 
 
 
-
-#########################################
+##############################################################
 # 5) Run fastMNN
-#########################################
-
+##############################################################
 ### Ref: http://htmlpreview.github.io/?https://github.com/satijalab/seurat-wrappers/blob/master/docs/fast_mnn.html
 ### https://bioconductor.org/packages/release/bioc/html/batchelor.html
 
+### Load GSC data and update to v3
+load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata")
+BTSC <- UpdateSeuratObject(BTSC)
 
 
 
-#########################################
-# 6) Run Batchelor package options
-#########################################
+
+##############################################################
+# 6) Run Batchelor package options (future option)
+##############################################################
 
 ### Ref: http://htmlpreview.github.io/?https://github.com/satijalab/seurat-wrappers/blob/master/docs/fast_mnn.html
 ### https://bioconductor.org/packages/release/bioc/html/batchelor.html
@@ -252,9 +282,6 @@ saveRDS(BTSC.liger, file = "Global_SU2C_GSCs_Seurat_LIGER.rds")
 ### variation. Thus, rescaleBatches() is best suited for merging technical
 ### replicates of the same sample, e.g., that have been sequenced separately.
 
-
-
-
 ##########################
 # 6.3) Multi-batch Normalization
 ##########################
@@ -265,7 +292,42 @@ saveRDS(BTSC.liger, file = "Global_SU2C_GSCs_Seurat_LIGER.rds")
 ### transformed normalized expression values that can be directly used for
 ### further correction.
 
-
 ##########################
 # 6.4) Multi-batch PCA
 ##########################
+
+
+
+
+
+
+##############################################################
+# 7) Combine metadata across batch correction
+##############################################################
+
+### 7.1) Format original clustering
+### 7.2) Format CONOS
+### 7.3) Format LIGER
+### 7.4) Format fastMNN
+### 4.5) Format
+
+### subset out meta.data
+LIGER_meta <- BTSC.liger@meta.data
+colnames(LIGER_meta)[grep("^res.2", colnames(LIGER_meta))] <- "OriginalClustering_res.2"
+colnames(LIGER_meta)[grep("seurat_clusters", colnames(LIGER_meta))] <- "LIGER_clusters_res.2"
+colnames(LIGER_meta)[grep("^clusters", colnames(LIGER_meta))] <- "LIGER_QuantNorm_clusters"
+LIGER_meta$RNA_snn_res.2 <- NULL
+
+##append original and LIGER UMAP coordinates
+LIGER_meta <- cbind(LIGER_meta, BTSC@reductions$umap@cell.embeddings)
+colnames(LIGER_meta)[grep("^UMAP_1", colnames(LIGER_meta))] <- "OriginalClustering_UMAP1"
+colnames(LIGER_meta)[grep("^UMAP_2", colnames(LIGER_meta))] <- "OriginalClustering_UMAP2"
+
+LIGER_meta <- cbind(LIGER_meta, BTSC.liger@reductions$umap@cell.embeddings)
+LIGER_meta <- cbind(LIGER_meta, BTSC@reductions$umap@cell.embeddings)
+colnames(LIGER_meta)[grep("^UMAP_1", colnames(LIGER_meta))] <- "LIGER_UMAP1"
+colnames(LIGER_meta)[grep("^UMAP_2", colnames(LIGER_meta))] <- "LIGER_UMAP2"
+
+##add CONOS meta.data
+
+saveRDS(LIGER_meta, file = "Liger_original_meta.rds")
