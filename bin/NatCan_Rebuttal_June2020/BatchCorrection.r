@@ -333,27 +333,48 @@ saveRDS(BTSC_fMNN, file = "Global_SU2C_GSCs_Seurat_fastMNN.rds")
 ##############################################################
 
 ### 7.1) Format original clustering
+load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata")
+meta <- BTSC@meta.data
+meta$Original_clusters <- meta$res.2
+meta$res.2 <- NULL
+meta <- cbind(meta, BTSC@dr$umap@cell.embeddings)
+colnames(meta) <- gsub("UMAP1", "Original_UMAP1", colnames(meta))
+colnames(meta) <- gsub("UMAP2", "Original_UMAP2", colnames(meta))
+
 ### 7.2) Format CONOS
+conos <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/BatchCorrection/CONOS/Global_SU2C_GSCs_Seurat.CONOS.rds")
+meta$Conos_clusters <- paste0("C", conos@meta.data$leiden)
+meta$Conos_UMAP1 <- conos@reductions$UMAP@cell.embeddings[ ,1]
+meta$Conos_UMAP2 <- conos@reductions$UMAP@cell.embeddings[ ,2]
+
 ### 7.3) Format LIGER
+liger <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/BatchCorrection/Liger/Global_SU2C_GSCs_Seurat_LIGER.rds")
+meta$Liger_clusters <- paste0("C", as.numeric(liger@meta.data$seurat_clusters))
+meta$Liger_quantNorm_clusters <- paste0("C", as.numeric(liger@meta.data$clusters))
+meta$Liger_UMAP1 <- liger@reductions$umap@cell.embeddings[ ,1]
+meta$Liger_UMAP2 <- liger@reductions$umap@cell.embeddings[ ,2]
+
 ### 7.4) Format fastMNN
+fastMNN <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/BatchCorrection/fastMNN/Global_SU2C_GSCs_Seurat_fastMNN.rds")
+meta$fastMNN_clusters <- paste0("C", as.numeric(fastMNN@meta.data$seurat_clusters))
+meta$fastMNN_UMAP1 <- fastMNN@reductions$umap@cell.embeddings[ ,1]
+meta$fastMNN_UMAP2 <- fastMNN@reductions$umap@cell.embeddings[ ,2]
 
-### subset out meta.data
-LIGER_meta <- BTSC.liger@meta.data
-colnames(LIGER_meta)[grep("^res.2", colnames(LIGER_meta))] <- "OriginalClustering_res.2"
-colnames(LIGER_meta)[grep("seurat_clusters", colnames(LIGER_meta))] <- "LIGER_clusters_res.2"
-colnames(LIGER_meta)[grep("^clusters", colnames(LIGER_meta))] <- "LIGER_QuantNorm_clusters"
-LIGER_meta$RNA_snn_res.2 <- NULL
+### 7.5) Save combined metadata
+saveRDS(meta, file = "Global_GSC_BatchCorrection_metadata.rds")
 
-##append original and LIGER UMAP coordinates
-LIGER_meta <- cbind(LIGER_meta, BTSC@reductions$umap@cell.embeddings)
-colnames(LIGER_meta)[grep("^UMAP_1", colnames(LIGER_meta))] <- "OriginalClustering_UMAP1"
-colnames(LIGER_meta)[grep("^UMAP_2", colnames(LIGER_meta))] <- "OriginalClustering_UMAP2"
 
-LIGER_meta <- cbind(LIGER_meta, BTSC.liger@reductions$umap@cell.embeddings)
-LIGER_meta <- cbind(LIGER_meta, BTSC@reductions$umap@cell.embeddings)
-colnames(LIGER_meta)[grep("^UMAP_1", colnames(LIGER_meta))] <- "LIGER_UMAP1"
-colnames(LIGER_meta)[grep("^UMAP_2", colnames(LIGER_meta))] <- "LIGER_UMAP2"
+##############################################################
+# 8) Combine normalized matrices into lists across technologies
+##############################################################
+### This is pointless because none of these tools change the expression values
+### They operate on PCA or other dim reductions
+### But alas...we have to please reviewer #4....
 
-##add CONOS meta.data
+norm.dat <- list(BTSC@data,
+                 conos@assays$RNA@data,
+                 liger@assays$RNA@data,
+                 fastMNN@assays$RNA@data
+                )
 
-saveRDS(LIGER_meta, file = "Liger_original_meta.rds")
+saveRDS(norm.dat, file = "Global_GSC_BatchCorrection_normdat.rds")
