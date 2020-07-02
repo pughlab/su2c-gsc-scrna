@@ -211,3 +211,10 @@ saveRDS(master.counts, file = "TCGA_GBM_CNV_Counts.rds")
 saveRDS(arm_avg, file = "TCGA_GBM_CNV_armAvg.rds")
 saveRDS(arm_med, file = "TCGA_GBM_CNV_armMed.rds")
 saveRDS(arm_mod, file = "TCGA_GBM_CNV_armMode.rds")
+
+### 4.2) Determine optimal CNV arm classification
+### see jupyter notebook TCGA_CNV_Plotting.ipynb
+
+### merge GSVA results with CNV results
+avg <- t(avg)
+avg <- round(avg)
