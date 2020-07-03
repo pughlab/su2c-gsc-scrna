@@ -25,13 +25,11 @@
 #devtools::install_github("satijalab/seurat-wrappers")
 #devtools::install_github("hms-dbmi/conos")
 #devtools::install_github('MacoskoLab/liger')
-
 library(Seurat) #v3.1.5
 library(SeuratWrappers) #v0.2.0
 library(conos) #v1.3.0
 library(liger) #v0.5.0
 library(batchelor) #v1.2.4 (used in fastMNN seurat wrapper)
-
 
 
 ##############################################################
