@@ -89,17 +89,11 @@ AUC <- data.frame(AUC)
 print(AUC[1:2, 1:2])
 
 ### merge AUCell scores to seuart meta.data
-BTSC <- AddMetaData(BTSC, metadata = AUC)
-
+#BTSC <- AddMetaData(BTSC, metadata = AUC)
+saveRDS(AUC, file = "Astrocyte_AUCell_scores_GSCs.rds")
 ### save AUCell scores + metadata
-BTSC_AUCell <- BTSC@meta.data
-saveRDS(BTSC_AUCell , file = "Astrocyte_AUCell_GSCs.rds")
+BTSC_AUCell <- cbind(BTSC@meta.data, AUC)
+saveRDS(BTSC_AUCell, file = "Astrocyte_AUCell_meta_GSCs.rds")
 
 #save the Seurat Object
-save(BTSC, file = "Astrocyte_AUCell_GSCs_SeuratObj.rd")
-
-
-
-##############################################################
-# 3) Run AUCell
-##############################################################
+#save(BTSC, file = "Astrocyte_AUCell_GSCs_SeuratObj.rd")
