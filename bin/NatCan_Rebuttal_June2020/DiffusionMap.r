@@ -11,11 +11,17 @@
 ### 1) Run Diffusion Map on GSCs
 ### 2) Save data
 ##############################################################
+BTSC_TumourCells_G800Removed_AUCell_Seurat.Rdata
+
 PatientID <- sapply(strsplit(rownames(BTSC_TumourCells@meta.data),"_"), `[`, 2)
 SampleID <- paste(sapply(strsplit(rownames(BTSC_TumourCells@meta.data),"_"), `[`, 2),
                   sapply(strsplit(rownames(BTSC_TumourCells@meta.data),"_"), `[`, 3),
                   sep = "_"
                 )
+BTSC_TumourCells@meta.data$PatientID <- PatientID
+BTSC_TumourCells@meta.data$SampleID <- SampleID
+head(BTSC_TumourCells@meta.data)
+saveRDS(BTSC_TumourCells, file = "BTSC_TumourCells_G800Removed_AUCell_Seurat.rds")
 ##############################################################
 ### EXAMPLE EXECUTION ON H4H
 ##
