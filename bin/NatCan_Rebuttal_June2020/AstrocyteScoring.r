@@ -22,7 +22,7 @@ library(BBmisc)
 ##############################################################
 # 1) Format gene signatures
 ##############################################################
-
+options(stringsAsFactors = F)
 ### load (astrocyte) gene signatures (n=13)
 astro <- read.csv("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/AstrocyteScoring/input_data/AstrocyteSignatures_NatCan_July2020.csv")
 astro <- convertColsToList(astro)
@@ -30,6 +30,7 @@ removeEmpty <- function(i){return(i[i != ""])}
 removeDash <- function(i){return(i[i != "--"])}
 astro <- lapply(astro, removeEmpty)
 astro <- lapply(astro, removeDash)
+astro <- lapply(astro, toupper)
 str(astro)
 
 ### load global set of gene signatures (n=116)
