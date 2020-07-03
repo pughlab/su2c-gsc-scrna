@@ -82,7 +82,7 @@ cells_assignment <- AUCell_exploreThresholds(cells_AUC,
                                              assign=TRUE
                                             )
 
-AUC <- t(as.data.frame(cells_AUC@assays$data$AUC))
+AUC <- t(as.data.frame(cells_AUC@assays@data$AUC))
 colnames(AUC) <- paste0(colnames(AUC), "_AUC")
 AUC <- data.frame(AUC)
 print(AUC[1:2, 1:2])
