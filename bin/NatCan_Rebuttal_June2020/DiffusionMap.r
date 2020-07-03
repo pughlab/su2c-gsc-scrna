@@ -76,7 +76,7 @@ data <- opt$data
 outName <- opt$outName
 downsample <- opt$downsample
 
-print(paste0("Dataset: ",samples))
+print(paste0("Dataset: ",data))
 print(paste0("Output file prefix: ", outName))
 print(paste0("Downsample cells: ", downsample))
 
