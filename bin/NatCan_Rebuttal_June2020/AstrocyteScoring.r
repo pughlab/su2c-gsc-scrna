@@ -11,9 +11,9 @@
 ### GENERAL OVERVIEW OF THIS SCRIPT
 ### 1) Load Global GSC data (corresponds to Ext Data Fig 4.)
 ### 2) Run AUCell to score GSCs with astrocyte signatures
-### 3) Plot astrocyte gene sig activity bewteen Dev and IR
-### 4) Correlate gene signatures to Dev and IR scores
-### 5) Plot Big heatmap to see which scores are most correlated
+### 3) Correlate gene signatures to Dev and IR scores
+### 4) Plot astrocyte gene sig activity bewteen Dev and IR ()
+### 5) Plot Big heatmap to see which scores are most correlated ()
 ##############################################################
 library(Seurat) #v3.1.5
 library(AUCell) #v1.8.0
@@ -96,3 +96,9 @@ saveRDS(BTSC_AUCell , file = "Astrocyte_AUCell_GSCs.rds")
 
 #save the Seurat Object
 save(BTSC, file = "Astrocyte_AUCell_GSCs_SeuratObj.rd")
+
+
+
+##############################################################
+# 3) Run AUCell
+##############################################################

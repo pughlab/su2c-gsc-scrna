@@ -12,7 +12,7 @@
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
 ### 1) Classify hybrid cells as Dev or IR
-### 2)
+### 2) Look for enriched CNVs
 ##############################################################
 
 library(Seurat)
