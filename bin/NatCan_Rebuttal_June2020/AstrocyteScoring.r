@@ -16,7 +16,7 @@
 ### 5) Plot Big heatmap to see which scores are most correlated
 ##############################################################
 library(Seurat) #v3.1.5
-library(AUCell #v1.8.0
+library(AUCell) #v1.8.0
 library(BBmisc)
 
 ##############################################################
@@ -44,6 +44,22 @@ saveRDS(sigs, file = "./input_data/Gene_Signatures_wAstrocytes_July2020.rds")
 # 2) Run AUCell
 ##############################################################
 
+##############################################################
+### EXAMPLE EXECUTION ON H4H
+###
+### #!/bin/bash
+### #SBATCH -t 5:00:00
+### #SBATCH --mem=100G
+### #SBATCH -p veryhimem
+### #SBATCH -c 30
+### #SBATCH -N 1
+### #SBATCH --account=pughlab
+###
+### module load R/3.6.1
+###
+### Rscript AstrocyteScoring.R
+##############################################################
+
 ### load global GSC data
 load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata")
 exprMatrix <- as.matrix(BTSC@data)
@@ -55,7 +71,7 @@ sigs <- readRDS("./input_data/Gene_Signatures_wAstrocytes_July2020.rds")
 
 ### run AUCell
 cells_rankings <- AUCell_buildRankings(exprMatrix,
-                                       nCores=1,
+                                       nCores=30,
                                        plotStats=FALSE)
 
 cells_AUC <- AUCell_calcAUC(sigs,
