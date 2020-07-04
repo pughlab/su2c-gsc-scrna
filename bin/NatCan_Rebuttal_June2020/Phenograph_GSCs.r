@@ -20,16 +20,17 @@ library(AUCell) #v1.8.0
 library(BBmisc)
 library(ggplot2)
 library(gridExtra)
+library(Rphenograph)
 
 #### write a function for UMAP plotting
-plot_UMAP <- function(dat){
+plot_tSNE <- function(dat){
 
         plot.title <-  paste(unique(dat$orig.ident), " ", nrow(dat), "cells")
 
-        sample_umap <- ggplot(dat, aes(x=UMAP1, y=UMAP2, color=Rphenograph_clusters)) +
+        sample_umap <- ggplot(dat, aes(x=tSNE1, y=tSNE2, color=Rphenograph_clusters)) +
                    geom_point(alpha = 0.6, size = 1.5, pch = 16) +
                    labs(x = NULL, y = NULL, title = plot.title) +
-                   scale_colour_brewer(palette = "Dark2") +
+                   #scale_colour_brewer(palette = "Dark2") +
                    theme_bw() +
                    theme(axis.text.x = element_blank(), axis.text.y = element_blank(),
                          axis.ticks = element_blank(),
@@ -75,14 +76,14 @@ for (i in 1:length(files)){
       Rphenograph_clusters <- membership(Rphenograph_out[[2]])
       names(Rphenograph_clusters) <- rownames(BTSC@meta.data)
       BTSC@meta.data$Rphenograph_clusters <- as.factor(Rphenograph_clusters)
-      BTSC@meta.data$UMAP1 <- BTSC@reductions$pca@cell.embeddings[ ,1]
-      BTSC@meta.data$UMAP2 <- BTSC@reductions$pca@cell.embeddings[ ,2]
+      BTSC@meta.data$tSNE1 <- BTSC@reductions$tsne@cell.embeddings[ ,1]
+      BTSC@meta.data$tSNE2 <- BTSC@reductions$tsne@cell.embeddings[ ,2]
 
       meta <- BTSC@meta.data
       meta_combo[[sample]] <- meta
       meta.file <- paste0(sample, "_Rphenograph_meta.rds")
       saveRDS(meta, file = meta.file)
-      plots[[i]] <- plot_UMAP(meta)
+      plots[[i]] <- plot_tSNE(meta)
 
       #differential gene expression analysis
       BTSC <- SetIdent(BTSC, value = "Cluster.ID")
@@ -98,7 +99,7 @@ for (i in 1:length(files)){
 # 2) Plot and save results
 ##############################################################
 
-pdf("GSC_RphenographClustering.pdf", height = 21, width = 15)
+pdf("GSC_UMAP_RphenographClustering.pdf", height = 21, width = 15)
 do.call(grid.arrange, plots)
 dev.off()
 
