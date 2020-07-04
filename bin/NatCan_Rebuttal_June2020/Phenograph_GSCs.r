@@ -21,6 +21,7 @@ library(BBmisc)
 library(ggplot2)
 library(gridExtra)
 library(Rphenograph)
+library(cluster)
 
 #### write a function for UMAP plotting
 plot_tSNE <- function(dat){
@@ -106,3 +107,58 @@ dev.off()
 saveRDS(meta_combo, file = "GSC_Rphenograph_meta.rds")
 saveRDS(DE_seurat, file = "GSC_Rphenograph_DE_SeuratClusters.rds")
 saveRDS(DE_phenograph, file = "GSC_Rphenograph_DE_PhenographClusters.rds")
+
+
+##############################################################
+# 3) Calculate sil widht per cluster
+##############################################################
+### Ref: https://www.rdocumentation.org/packages/cluster/versions/2.1.0/topics/silhouette
+
+options(stringsAsFactors = F)
+
+file.path <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/"
+files <- list.files(file.path, pattern = "_L_res")
+load.files <- paste0(file.path, files)
+
+meta.file.path <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/Phenograph/"
+meta.files <- list.files(meta.file.path, pattern = "phenograph_meta.rds")
+
+sil_phenograph <- list() #averag per cluster
+sil_seurat <- list() #average per cluster
+
+for (i in 1:length(files)){
+
+      print("")
+      print("*****************")
+      print(paste0(i, "/", length(files)))
+      print(files[i])
+      print("*****************")
+      load(load.files[i]) #load GSC Data
+      BTSC@meta.data$PC.use <- length(BTSC@calc.params$RunUMAP$dims.use)
+      BTSC <- UpdateSeuratObject(BTSC)
+      sample <- as.character(unique(BTSC@meta.data$orig.ident))
+      pc.dat <- BTSC@reductions$pca@cell.embeddings[ ,1:unique(BTSC@meta.data$PC.use)] #subset out pc cell embeddings
+      pc.dist <- dist(pc.dat)
+
+      BTSC <- SetIdent(BTSC, value = "Cluster.ID")
+      seurat_clusters <- as.integer(Idents(BTSC))
+      sil_1 <- cluster::silhouette(seurat_clusters,
+                                   dist = pc.dist,
+                                   do.clus.stat = TRUE
+                                 )
+      sil_seurat[[sample]] <- summary(sil_1)$clus.avg.widths
+
+      #load R phenograph ids from saved meta
+      meta.load.file <- paste0(meta.file.path, meta.files[grep(sample, meta.files)])
+      meta <- readRDS(meta.load.file)
+      phenograph_clusters <- as.integer(meta$Rphenograph_clusters)
+      sil_2 <- cluster::silhouette(phenograph_clusters,
+                                   dist = pc.dist,
+                                   do.clus.stat = TRUE
+                                 )
+      sil_phenograph[[sample]] <- summary(sil_2)$clus.avg.widths
+
+}
+
+saveRDS(sil_seurat, file = 'GSC_Rphenograph_Sil_SeuratClusters.rds')
+saveRDS(sil_phenograph, file = 'GSC_Rphenograph_Sil_PhenographClusters.rds')
