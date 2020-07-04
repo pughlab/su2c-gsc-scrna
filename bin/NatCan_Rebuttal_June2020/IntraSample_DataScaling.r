@@ -67,3 +67,24 @@ meta_orig <- dat@meta.data
 pca_orig <- dat@reductions$pca
 saveRDS(meta_orig, file = "Original_GCC_GBM_meta.rds")
 saveRDS(pca_orig, file = "Original_GCC_GBM_pca.rds")
+
+
+##############################################################
+### 5) Correlate cell embeddings between processing methods
+##############################################################
+
+
+
+
+
+
+
+##############################################################
+### 6) Correlate gene loadings between processing methods
+##############################################################
+
+
+
+##############################################################
+### 7) Plot Jaccard Overlap
+##############################################################
