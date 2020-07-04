@@ -53,7 +53,10 @@ files <- list.files(file.path, pattern = "_L_res")
 load.files <- paste0(file.path, files)
 
 plots <- list() ##append phenograph UMAPs to
-DE <- list()
+DE_phenograph <- list()
+DE_seurat <- list()
+meta_combo <- list()
+
 for (i in 1:length(files)){
 
       print("")
@@ -76,20 +79,27 @@ for (i in 1:length(files)){
       BTSC@meta.data$UMAP2 <- BTSC@reductions$pca@cell.embeddings[ ,2]
 
       meta <- BTSC@meta.data
+      meta_combo[[sample]] <- meta
       meta.file <- paste0(sample, "_Rphenograph_meta.rds")
       saveRDS(meta, file = meta.file)
       plots[[i]] <- plot_UMAP(meta)
 
       #differential gene expression analysis
+      BTSC <- SetIdent(BTSC, value = "Cluster.ID")
+      DE_seurat[[sample]] <- FindAllMarkers(BTSC) #seurat clusters
       BTSC <- SetIdent(BTSC, value = "Rphenograph_clusters")
-      DE[[sample]]<- FindAllMarkers(BTSC)
+      DE_phenograph[[sample]] <- FindAllMarkers(BTSC) #phenograph clusters
 
 }
 
 ##############################################################
-# 2) Plot results
+# 2) Plot and save results
 ##############################################################
 
 pdf("GSC_RphenographClustering.pdf", height = 21, width = 15)
 do.call(grid.arrange, plots)
 dev.off()
+
+saveRDS(meta_combo, file = "GSC_Rphenograph_meta.rds")
+saveRDS(DE_seurat, file = "GSC_Rphenograph_DE_SeuratClusters.rds")
+saveRDS(DE_phenograph, file = "GSC_Rphenograph_DE_PhenographClusters.rds")
