@@ -85,7 +85,7 @@ opt <- parse_args(opt_parser)
 dat.file <- opt$dat.file
 outFileName <- opt$outFileName
 
-print(paste0("Dataset: ",data))
+print(paste0("Dataset: ",dat.file))
 print(paste0("Output file prefix: ", outFileName))
 
 
