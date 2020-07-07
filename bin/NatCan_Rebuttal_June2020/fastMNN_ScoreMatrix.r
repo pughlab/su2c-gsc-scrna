@@ -106,7 +106,7 @@ orig_AUC  <- data.frame(orig_AUC)
 print(orig_AUC [1:2, 1:2])
 
 ### 3.2) correlate signatures
-cor.mat <- cbind(AUC[ ,!c("SampleID")], orig_AUC)
+cor.mat <- cbind(AUC[ ,!colnames(AUC) %in% c("SampleID")], orig_AUC)
 cor.mat <- cor(cor.mat, method = "pearson")
 
 
@@ -114,7 +114,7 @@ cor.mat <- cor(cor.mat, method = "pearson")
 ##############################################################
 ### 4) Save data
 ##############################################################
-saveRDS(orig_AUC, file = "Original_DevIR_AUCell_GSCs.rds"))
+saveRDS(orig_AUC, file = "Original_DevIR_AUCell_GSCs.rds")
 saveRDS(AUC, file = "fastMNN_DevIR_AUCell_GSCs.rds")
 saveRDS(cor.mat, file = "Original_fastMNN_AUCell_PearsonCorr.rds")
 ### save AUCell scores + metadata
