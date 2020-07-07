@@ -59,9 +59,11 @@ saveRDS(exprMatrix, file = "Global_GSCs_fastMNN_correctedExpMat_ALLGENES.rds")
 ### 3) Run AUCell with Dev and IR signatures
 ##############################################################
 #exprMatrix <- readRDS("Global_GSCs_fastMNN_correctedExpMat_ALLGENES.rds")
+#load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/AstrocyteScoring/input_data/AUCell_Signatures_Hypoxia.Rdata")
+#sigs <- sigs[c("Developmental_GSC", "InjuryResponse_GSC")]
 
 cells_rankings <- AUCell_buildRankings(exprMatrix,
-                                       nCores=30,
+                                       #nCores=1,
                                        plotStats=FALSE)
 
 cells_AUC <- AUCell_calcAUC(sigs,
@@ -77,8 +79,22 @@ colnames(AUC) <- paste0(colnames(AUC), "_AUC")
 AUC <- data.frame(AUC)
 print(AUC[1:2, 1:2])
 
+x <- strsplit(rownames(AUC), "_")
+AUC$SampleID <- sapply( x, "[", 1)
+AUC$SampleID <- paste0(AUC$SampleID, "_L")
+
+##############################################################
+### 3) Corrlelate scores to original
+##############################################################
+
+
 
 
 ##############################################################
-### 3) Save data
+### 4) Save data
 ##############################################################
+
+saveRDS(AUC, file = "fastMNN_DevIR_AUCell_GSCs.rds")
+### save AUCell scores + metadata
+#BTSC_AUCell <- cbind(BTSC@meta.data, AUC)
+#saveRDS(BTSC_AUCell, file = "fastMNN_DevIR_AUCell_meta_GSCs.rds")
