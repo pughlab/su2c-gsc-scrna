@@ -4,7 +4,7 @@
 #                         July 2020                          #
 ##############################################################
 ### Reference: https://bioconductor.org/packages/release/bioc/vignettes/batchelor/inst/doc/correction.html#3_mutual_nearest_neighbors
-### Working dir: /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/Nuclei_fastMNN
+### Working dir: /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/Nuclei_integration/mnn
 
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
@@ -68,15 +68,56 @@ saveRDS(sce_cells, file = "scRNA_LogNormCounts.rds")
 ### (and on which those vectors are applied). This can be turned
 ### off to obtain corrected values on the log-scale, similar to
 ### the input data.
-library(Seurat) #v3.1.5
-library(batchelor) #v1.2.4 (used in fastMNN seurat wrapper)
-library(scater)
+###
+### Interesting thread: http://supportupgrade.bioconductor.org/p/120471/#120512
+###
+##############################################################
+### EXAMPLE EXECUTION ON H4H
+### #!/bin/bash
+### #SBATCH -t 24:00:00
+### #SBATCH --mem=150G
+### #SBATCH -p veryhimem
+### #SBATCH -c 30
+### #SBATCH -N 1
+### #SBATCH --account=pughlab
+###
+### module load R/3.6.1
+###
+### Rscript mnn_nuclei.r
+##############################################################
 
+#library(Seurat) #v3.1.5
+library(batchelor) #v1.2.4 (used in fastMNN seurat wrapper)
+library(scater) #v1.14.6
+library(parallel)
+library(BiocParallel)
+
+print("Configure Parallelization with ")
+print(Sys.time())
+options(MulticoreParam=quote(MulticoreParam(workers=multicoreWorkers())))
+
+print("Loading Data")
+print(Sys.time())
 sce_cells <- readRDS("scRNA_LogNormCounts.rds")
 sce_nuclei <- readRDS("snRNA_LogNormCounts.rds")
+
+print("Run Mnn")
+print(Sys.time())
+### with more cells, a larger k should be used to achieve better merging
+### in non-orthogonality. To achieve this, we can set prop.k, which
+### allows k to adapt to batch size
+### A numeric scalar in (0, 1) specifying the proportion of cells
+### in each dataset to use for mutual nearest neighbor searching.
+###  If set, ‘k’ for the search in each batch is redefined as
+### ‘max(k, prop.k*N)’ where ‘N’ is the number of cells in that batch.
 mnn_out <- mnnCorrect(sce_cells,
                       sce_nuclei,
+                      prop.k = 0.8,
+                      BPPARAM = MulticoreParam(),
                       correct.all = TRUE,
-                      cos.norm.out = FALSE #corrected log-scale values
+                      cos.norm.out = FALSE #output corrected log-scale values
                     )
+
+print("Saving Data")
+print(Sys.time())
 saveRDS(mnn_out, file = "Nuclei_liveCell_mnn.rds")
