@@ -12,6 +12,11 @@
 #                         July 2020                          #
 ##############################################################
 ### Reference: Aiden from Gary Bader's Lab
+### Example execution on H4H:
+### sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/MutationCalling_scRNA.sh /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/bams/BT147_L.possorted_genome_bam.bam
+
+module load samtools/1.10
+module load gatk/4.0.5.1
 
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
@@ -20,45 +25,42 @@
 ### 3) Run HaplotypeCaller (outpus vcf)
 ##############################################################
 
-module load samtools/1.10
-module load gatk/4.0.5.1
-
 start=`date +%s`
+echo ""
 echo "********************"
 echo "Set up variables"
 date
 echo "********************"
-echo ""
 ### path to scRNA bam outputted by CellRanger
 ### ie. /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/BT147_L.possorted_genome_bam.bam
 bam=$1
-echo $bam
-### input sample name
-### this will be appended to out files
+### input sample name; this will be appended to out files
 inp=$(basename $bam .possorted_genome_bam.bam)
-echo $inp
 ### path to reference genome
 ref=/cluster/projects/pughlab/references/cellranger_10x/refdata-cellranger-GRCh38-1.2.0/fasta/genome.fa
+
+echo $inp
+echo $bam
 echo $ref
-### set up directory schema
+### set up outs directory
 mkdir $inp
 cd $inp
 
 
+echo ""
 echo "********************"
 echo "Sort bam with samtools"
 date
 echo "********************"
-echo ""
 samout="${inp}_temp_samsorted.bam"
 samtools sort $bam -o $samout
 
 
+echo ""
 echo "********************"
 echo "GATK AddOrReplaceReadGroups (Picard)"
 date
 echo "********************"
-echo ""
 ARGout="${inp}__temp_sort_addgroup.bam"
 gatk AddOrReplaceReadGroups --INPUT $samout  --OUTPUT $ARGout --RGLB lib1 --RGPL illumina --RGPU unit1 --RGSM 20 --SORT_ORDER coordinate
 
@@ -76,30 +78,30 @@ rm $samout
 rm $ARGout
 
 
+echo ""
 echo "********************"
 echo "GATK SplitNCigarReads"
 date
 echo "********************"
-echo ""
 SNCout="${inp}_temp_sort_addgroup_dedupped_splitN.bam"
 gatk SplitNCigarReads -R $ref -I $MDout -O $SNCout
 rm $MDmetrix
 rm $MDout
 
 
+echo ""
 echo "********************"
 echo "Run HaplotypeCaller"
 date
 echo "********************"
-echo ""
 varfile="vars/${inp}_gatk_variants.vcf"
 gatk HaplotypeCaller -R $ref -I $SNCout --dont-use-soft-clipped-bases  --standard-min-confidence-threshold-for-calling 20.0 -O $varfile
 rm $SNCout
 rm *_splitN.*
 
 
+echo ""
 echo "********************"
 echo "END"
 echo "Duration: $((($(date +%s)-$start)/60)) minutes"
 echo "********************"
-echo ""
