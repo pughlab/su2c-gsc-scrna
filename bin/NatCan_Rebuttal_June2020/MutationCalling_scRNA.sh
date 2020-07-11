@@ -10,9 +10,8 @@
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
 ### 1) Sort bam with samtools
-### 2) Run mnnCorrect from Batchelor package
-### 3) Recore corrected matrix with Dev and IR
-### 4) Save results
+### 2) GATK AddOrReplaceReadGroups, MarkDuplicates, SplitNCigarReads
+### 3) Run HaplotypeCaller (outpus vcf)
 ##############################################################
 
 module load samtools/1.10
@@ -25,21 +24,16 @@ date
 echo "********************"
 echo ""
 ### path to scRNA bam outputted by CellRanger
-### ie. BT147_L.possorted_genome_bam.bam
-#inp=$1
-#bam=$1
-bam=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/BT147_L.possorted_genome_bam.bam
+### ie. /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/BT147_L.possorted_genome_bam.bam
+bam=$1
 echo $bam
-
 ### input sample name
 ### this will be appended to out files
 inp=$(basename $bam .possorted_genome_bam.bam)
 echo $inp
-
 ### path to reference genome
 ref=/cluster/projects/pughlab/references/cellranger_10x/refdata-cellranger-GRCh38-1.2.0/fasta/genome.fa
 echo $ref
-
 ### set up directory schema
 mkdir $inp
 cd $inp
