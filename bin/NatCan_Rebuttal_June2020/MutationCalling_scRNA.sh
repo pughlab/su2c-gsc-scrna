@@ -1,4 +1,10 @@
 #!/bin/bash
+#SBATCH -t 24:00:00
+#SBATCH --mem=150G
+#SBATCH -p veryhimem
+#SBATCH -c 30
+#SBATCH -N 1
+#SBATCH --account=pughlab
 
 ##############################################################
 #             Mutation Calling pipeline in scRNA data        #
