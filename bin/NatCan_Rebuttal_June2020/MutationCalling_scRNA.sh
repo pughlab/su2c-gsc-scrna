@@ -43,9 +43,8 @@ echo $inp
 echo $bam
 echo $ref
 ### set up outs directory
-mkdir $inp
-cd $inp
-
+#mkdir $inp
+#cd $inp
 
 echo ""
 echo "********************"
@@ -94,7 +93,8 @@ echo "********************"
 echo "Run HaplotypeCaller"
 date
 echo "********************"
-varfile="vars/${inp}_gatk_variants.vcf"
+#varfile="vars/${inp}_gatk_variants.vcf"
+varfile="${inp}_gatk_variants.vcf"
 gatk HaplotypeCaller -R $ref -I $SNCout --dont-use-soft-clipped-bases  --standard-min-confidence-threshold-for-calling 20.0 -O $varfile
 rm $SNCout
 rm *_splitN.*
