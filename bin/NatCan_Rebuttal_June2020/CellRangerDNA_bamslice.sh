@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -t 24:00:00
-#SBATCH --mem=150G
-#SBATCH -p veryhimem
+#SBATCH --mem=60G
+#SBATCH -p himem
 #SBATCH -c 30
 #SBATCH -N 1
 #SBATCH --account=pughlab
@@ -18,11 +18,8 @@
 
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
-### 1) Extract cell barcodes from Seurat Object
-### 2)
-### 3)
-### 4)
-### 5)
+### 1) Run bamslice from cellranger-dna (v1.1.0)
+### Splits up bams by cell barcode (ExtractCellBarcodes_Seurat.r)
 ##############################################################
 
 module load cellranger-dna/1.1.0
@@ -39,4 +36,7 @@ echo "********************"
 
 cellranger-dna bamslice --id=$SAMPLEID \
                         --csv=$CB_CSV \
-                        --bam=$BAMFILE
+                        --bam=$BAMFILE \
+                        --jobmode="/cluster/projects/pughlab/projects/INSPIRE_scRNAseq/src/slurm.template" \
+                        --mempercore=6 \
+                        --maxjobs=40
