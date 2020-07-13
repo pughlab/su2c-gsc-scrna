@@ -59,10 +59,32 @@ print("")
 print("********************")
 print("Output csv file")
 print(Sys.time())
+###Output 2 csv files
 
-### The barcodes CSV files will each have one barcode entry per line,
+### (1) The barcodes CSV files will each have one barcode entry per line,
 ### including the GEM well suffix (see GEM wells). Each such file will ### look something like: AAACGGGTCAAAGTGA-1
-fileName <- paste0(outFilePrefix, "_CellBarcodes.csv")
-fileConn <- file(fileName)
-writeLines(cells, fileConn)
-close(fileConn)
+fileName <- paste0(getwd(), "/", outFilePrefix, "_CellBarcodes.csv")
+cells <- as.matrix(cells)
+write.table(cells,
+           file = fileName,
+           quote = FALSE,
+           col.names = FALSE,
+           row.names = FALSE,
+           sep = ","
+           )
+
+### (2) master csv file pointing to csv above
+mastercsv <- matrix(c(outFilePrefix, fileName),
+                    ncol = 2,
+                    nrow = 1,
+                    byrow = TRUE
+                  )
+colnames(mastercsv) <- c("library_id", "barcodes_csv")
+fileName2 <- paste0(outFilePrefix, "_BamSlice_Config.csv")
+write.table(mastercsv,
+           file = fileName2,
+           quote = FALSE,
+           col.names = TRUE,
+           row.names = FALSE,
+           sep = ","
+           )

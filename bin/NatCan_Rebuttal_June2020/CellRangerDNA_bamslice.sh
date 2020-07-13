@@ -16,8 +16,6 @@
 ### Example execution on H4H:
 ### sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/CellRangerDNA_bamslice.sh /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/bams/BT147_L.possorted_genome_bam.bam
 
-module load cellranger-dna/1.1.0
-
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
 ### 1) Extract cell barcodes from Seurat Object
@@ -27,13 +25,18 @@ module load cellranger-dna/1.1.0
 ### 5)
 ##############################################################
 
-start=`date +%s`
+module load cellranger-dna/1.1.0
+
+SAMPLEID=G523_L
+CB_CSV=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/pilot/G523_L_BamSlice_Config.csv
+BAMFILE=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/bams/G523_L.possorted_genome_bam.bam
+
 echo ""
 echo "********************"
-echo "######"
+echo "Running CellRanger-DNA Bamslice"
 date
 echo "********************"
 
-cellranger-dna bamslice --id=tumor_subsets \
-                       --csv=tumor_subsets.csv \
-                       --bam=/home/jdoe/runs/tumor_mixed/outs/possorted_bam.bam
+cellranger-dna bamslice --id=$SAMPLEID \
+                        --csv=$CB_CSV \
+                        --bam=$BAMFILE
