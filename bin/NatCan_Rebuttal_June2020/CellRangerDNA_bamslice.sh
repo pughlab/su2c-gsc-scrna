@@ -22,6 +22,12 @@
 ### Splits up bams by cell barcode (ExtractCellBarcodes_Seurat.r)
 ##############################################################
 
+##############################################################
+### EXAMPLE EXECUTION ON H4H
+###
+###
+##############################################################
+
 module load cellranger-dna/1.1.0
 
 SAMPLEID=G523_L
