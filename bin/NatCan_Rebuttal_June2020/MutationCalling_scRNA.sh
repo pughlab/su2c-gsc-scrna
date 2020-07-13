@@ -22,7 +22,7 @@ module load gatk/4.0.5.1
 ### GENERAL OVERVIEW OF THIS SCRIPT
 ### 1) Sort bam with samtools
 ### 2) GATK AddOrReplaceReadGroups, MarkDuplicates, SplitNCigarReads
-### 3) Run HaplotypeCaller (outpus vcf)
+### 3) Run HaplotypeCaller (outputs vcf)
 ##############################################################
 
 start=`date +%s`
