@@ -11,10 +11,9 @@
 ### 1) Load invididual GSC objects
 ### 2) Run alternate seurat clustering algorithms
 ### 3) Spectral clustering across 2-10 centers (k)
-### 4)
-### 3) Compare cluster number
-### 4) Compare cluster compostion
-### 5) Plot scran clusters
+### 4) Calculate sil width arcross methods
+### 5) Plot tSNEs
+### 6) Save Data
 ##############################################################
 
 options(stringsAsFactors = F)
