@@ -11,10 +11,7 @@
 #                         L.Richards                         #
 #                         July 2020                          #
 ##############################################################
-### Reference: https://support.10xgenomics.com/single-cell-dna/software/pipelines/latest/using/bamslice
-###
-### Example execution on H4H:
-### sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/CellRangerDNA_bamslice.sh /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/bams/BT147_L.possorted_genome_bam.bam
+
 
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
@@ -30,15 +27,18 @@ module load gatk/4.0.5.1
 
 ##############################################################
 ### EXAMPLE EXECUTION ON H4H
-###
+### sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/MutationCallingPipeline_scRNA_wrapper.sh
 ##############################################################
 
+#### DEVELPOMENT ####
 SEURAT_OBJ=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/G523_L_res.0.2.RData
 SAMPLE_ID=G523_L
 BAM_FILE=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/bams/G523_L.possorted_genome_bam.bam
 REF=cluster/projects/pughlab/references/cellranger_10x/refdata-cellranger-GRCh38-1.2.0/fasta/genome.fa
 
 WORKING_DIR=$(pwd)
+
+
 
 ##############################################################
 ### 1) Extract and split barcodes from Seurat Object
@@ -59,6 +59,7 @@ wait
 echo "Duration: $((($(date +%s)-$start)/60)) minutes"
 
 
+
 ##############################################################
 ### 2) Run CellRanger-DNA bamslice on barcode chunks
 ###    'ExtractCellBarcodes_Seurat.r'
@@ -74,10 +75,13 @@ cd bamslice
 
 CB_CSV=$WORKING_DIR/$SAMPLE_ID/cell_barcodes/${SAMPLE_ID}_BamSlice_Config.csv
 
-sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/CellRangerDNA_bamslice.sh $SAMPLE_ID $CB_CSV $BAM_FILE
+bash /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/CellRangerDNA_bamslice.sh $SAMPLE_ID $CB_CSV $BAM_FILE
 wait
 
+#### add code to clean up big uneeded files from bam BamSlice
+
 echo "Duration: $((($(date +%s)-$start)/60)) minutes"
+
 
 
 ##############################################################
@@ -96,14 +100,11 @@ cd HaplotypeCaller
 ls $WORKING_DIR/${SAMPLE_ID}/cell_barcodes/*-1.csv > cellbams.txt
 
 for CELL_BAM in $(cat cellbams.txt); do
-
-    echo $CELL_BAM
+    #echo $CELL_BAM
     sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/HaplotypeCaller_MutationCalling_scRNA.sh $CELL_BAM $REF
-
 done
-wait
 
-echo "Duration: $((($(date +%s)-$start)/60)) minutes"
+
 
 ##############################################################
 echo '#####################################'
