@@ -25,7 +25,6 @@ loadRData <- function(fileName){
 #### USER VARIABLES
 seurat.obj <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/G523_L_res.0.2.RData"
 outFilePrefix <- "G523_L"
-splitSize <- 100 ##divide into 100 chunks of cells
 
 ##############################################################
 ### 1) Load seurat object ##############################################################
@@ -56,7 +55,9 @@ cells <- colnames((GetAssayData(dat, slot = "counts")))
 cells <- paste0(cells, "-1") ### add 10X GEM group to cell barcode
 cells <- as.character(cells)
 print(paste0(length(cells), " cells in object...."))
+
 ###chunk cell barcodes
+splitSize <- length(cells) ##output each cell into own csv
 print(paste0("Splitting cells into ", splitSize, " chunks..."))
 chunk <- function(x,n) split(x, factor(sort(rank(x)%%n)))
 cells <- chunk(cells, splitSize)

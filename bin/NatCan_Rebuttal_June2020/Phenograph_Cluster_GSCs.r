@@ -4,7 +4,7 @@
 #                         July 2020                          #
 ##############################################################
 ### REF: https://github.com/JinmiaoChenLab/Rphenograph
-### /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/Phenograph
+### /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/SC3
 
 
 ##############################################################
