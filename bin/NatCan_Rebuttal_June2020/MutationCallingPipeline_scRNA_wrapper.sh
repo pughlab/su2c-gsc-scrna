@@ -12,12 +12,11 @@
 #                         July 2020                          #
 ##############################################################
 
-
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
 ### 1) Extract cell barcodes from seurat object
-### 2) Use bamslice to make 1 bam per cell barcode
-### 3) Run Haplotyper on each bam
+### 2) Run bamslice to generate 1 bam per cell barcode
+### 3) sbatch HaplotypeCaller script on each bam
 ##############################################################
 
 module load R/3.6.1
@@ -28,6 +27,10 @@ module load gatk/4.0.5.1
 ##############################################################
 ### EXAMPLE EXECUTION ON H4H
 ### sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/MutationCallingPipeline_scRNA_wrapper.sh
+###
+###
+###
+###
 ##############################################################
 
 #### DEVELPOMENT ####
@@ -85,8 +88,10 @@ echo "Duration: $((($(date +%s)-$start)/60)) minutes"
 
 
 ##############################################################
-### 3) Run mutation calling pipeline
+### 3) sbatch mutation calling pipeline
 ##############################################################
+### This creates tons of jobs...1 job per cell/bam
+### Try submitting a few jobs with low
 echo '#####################################'
 echo '3) Mutation Calling Pipeline (HaplotypeCaller)'
 date
