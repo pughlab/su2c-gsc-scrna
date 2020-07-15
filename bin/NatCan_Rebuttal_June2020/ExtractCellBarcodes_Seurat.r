@@ -103,7 +103,7 @@ print(Sys.time())
 
 files <- c()
 for (i in 1:length(names(cells))){
-  print(names(cells)[i])
+  #print(names(cells)[i])
   fileName <- paste0(getwd(), "/", outFilePrefix, "_CellBarcodes",  "_", names(cells)[i], ".csv")
   files[i] <- fileName
   sub <- as.matrix(cells[[i]])
