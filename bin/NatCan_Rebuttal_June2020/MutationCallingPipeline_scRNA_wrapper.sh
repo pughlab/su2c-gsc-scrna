@@ -91,7 +91,7 @@ echo "Duration: $((($(date +%s)-$start)/60)) minutes"
 ### 3) sbatch mutation calling pipeline
 ##############################################################
 ### This creates tons of jobs...1 job per cell/bam
-### Try submitting a few jobs with low
+### Try submitting a few jobs with low memory (per cell bams are pretty small)
 echo '#####################################'
 echo '3) Mutation Calling Pipeline (HaplotypeCaller)'
 date
