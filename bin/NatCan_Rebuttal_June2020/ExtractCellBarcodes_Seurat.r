@@ -13,8 +13,9 @@
 ### 3) Save
 ##############################################################
 
-library(Seurat) #v3.0
-library(ggplot2)
+suppressMessages(library(Seurat)) #v3.0
+suppressMessages(library(ggplot2))
+suppressMessages(library(optparse))
 
 ##loads an RData file, and returns it with new name
 loadRData <- function(fileName){
@@ -22,9 +23,32 @@ loadRData <- function(fileName){
     get(ls()[ls() != "fileName"])
 }
 
-#### USER VARIABLES
-seurat.obj <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/G523_L_res.0.2.RData"
-outFilePrefix <- "G523_L"
+#########################################
+#  Parse Options
+#########################################
+
+option_list <- list(make_option("--seurat.obj",
+                                type = "character",
+                                default = NULL,
+                                help = "path to seurat object",
+                                metavar= "character"
+                               ),
+                     make_option("--outFilePrefix",
+                                type = "character",
+                                default = NULL,
+                                help = "will be appended to all output files",
+                                metavar= "character"
+                              ))
+opt_parser <- OptionParser(option_list=option_list)
+opt <- parse_args(opt_parser)
+seurat.obj <- opt$seurat.obj
+outFilePrefix <- opt$outFilePrefix
+
+#### DEVELOPMENT
+#seurat.obj <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/G523_L_res.0.2.RData"
+#outFilePrefix <- "G523_L"
+
+
 
 ##############################################################
 ### 1) Load seurat object ##############################################################
@@ -62,6 +86,8 @@ print(paste0("Splitting cells into ", splitSize, " chunks..."))
 chunk <- function(x,n) split(x, factor(sort(rank(x)%%n)))
 cells <- chunk(cells, splitSize)
 names(cells) <- paste0("Chunk", as.numeric(names(cells))+1)
+
+
 
 ##############################################################
 ### 3) Save data as BamSlice compatible csv ##############################################################
