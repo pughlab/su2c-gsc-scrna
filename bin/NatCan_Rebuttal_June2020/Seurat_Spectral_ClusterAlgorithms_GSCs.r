@@ -98,8 +98,8 @@ sil_Spectral8 <- list()
 sil_Spectral9 <- list()
 sil_Spectral10 <- list()
 
-#for (i in 1:length(files)){
-for (i in 1:2){
+for (i in 1:length(files)){
+#for (i in 1:2){
       ##############################################################
       print("")
       print("*****************")
@@ -364,7 +364,7 @@ print("Saving sil widths....")
 print("*****************")
 saveRDS(sil_Seurat, file = 'GSC_Sil_SLM.rds')
 saveRDS(sil_Louvain, file = 'GSC_Sil_Louvain.rds')
-saveRDS(sil_LouvainMLR, file = 'GSC_Sil_LouvainMLR.rds')
+saveRDS(sil_Louvain_MLR, file = 'GSC_Sil_LouvainMLR.rds')
 saveRDS(sil_Spectral2, file = 'GSC_Sil_Spectral2.rds')
 saveRDS(sil_Spectral3, file = 'GSC_Sil_Spectral3.rds')
 saveRDS(sil_Spectral4, file = 'GSC_Sil_Spectral4.rds')
