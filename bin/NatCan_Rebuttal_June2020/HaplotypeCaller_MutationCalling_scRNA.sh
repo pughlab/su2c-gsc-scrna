@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH -t 24:00:00
-#SBATCH --mem=150G
-#SBATCH -p veryhimem
+#SBATCH -t 10:00:00
+#SBATCH --mem=60G
+#SBATCH -p himem
 #SBATCH -c 30
 #SBATCH -N 1
 #SBATCH --account=pughlab
@@ -35,9 +35,10 @@ echo "********************"
 ### ie. /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/BT147_L.possorted_genome_bam.bam
 bam=$1
 ### input sample name; this will be appended to out files
-inp=$(basename $bam .possorted_genome_bam.bam)
+inp=$(basename $bam .csv)
 ### path to reference genome
-ref=/cluster/projects/pughlab/references/cellranger_10x/refdata-cellranger-GRCh38-1.2.0/fasta/genome.fa
+#ref=/cluster/projects/pughlab/references/cellranger_10x/refdata-cellranger-GRCh38-1.2.0/fasta/genome.fa
+ref=$2
 
 echo $inp
 echo $bam
