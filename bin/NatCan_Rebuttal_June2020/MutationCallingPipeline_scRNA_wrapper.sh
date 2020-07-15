@@ -102,14 +102,12 @@ cd $WORKING_DIR/$SAMPLE_ID
 mkdir HaplotypeCaller
 cd HaplotypeCaller
 
-ls $WORKING_DIR/${SAMPLE_ID}/cell_barcodes/*-1.csv > cellbams.txt
+ls $WORKING_DIR/${SAMPLE_ID}/bamslice/${SAMPLE_ID}/outs/subsets/*bam > cellbams.txt
 
 for CELL_BAM in $(cat cellbams.txt); do
     #echo $CELL_BAM
     sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/HaplotypeCaller_MutationCalling_scRNA.sh $CELL_BAM $REF
 done
-
-
 
 ##############################################################
 echo '#####################################'
