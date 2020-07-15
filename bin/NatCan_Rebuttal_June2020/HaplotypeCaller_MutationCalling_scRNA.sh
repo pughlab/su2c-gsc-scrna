@@ -15,8 +15,9 @@
 ### Example execution on H4H:
 ### sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/MutationCalling_scRNA.sh /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/bams/BT147_L.possorted_genome_bam.bam
 
-module load samtools/1.10
 module load gatk/4.0.5.1
+module load samtools/1.10
+
 
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
@@ -62,8 +63,7 @@ echo "GATK AddOrReplaceReadGroups (Picard)"
 date
 echo "********************"
 ARGout="${inp}__temp_sort_addgroup.bam"
-gatk AddOrReplaceReadGroups --INPUT $samout  --OUTPUT $ARGout --RGLB lib1 --RGPL illumina --RGPU unit1 --RGSM 20 --SORT_ORDER coordinate
-
+gatk AddOrReplaceReadGroups --INPUT $samout --OUTPUT $ARGout --RGLB lib1 --RGPL illumina --RGPU unit1 --RGSM 20 --SORT_ORDER coordinate
 
 
 echo "********************"
