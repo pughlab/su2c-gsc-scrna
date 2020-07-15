@@ -30,9 +30,14 @@
 
 module load cellranger-dna/1.1.0
 
-SAMPLEID=G523_L
-CB_CSV=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/pilot/G523_L_BamSlice_Config.csv
-BAMFILE=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/bams/G523_L.possorted_genome_bam.bam
+#### DEVELOPMENT ###
+#SAMPLE_ID=G523_L
+#CB_CSV=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/pilot/G523_L_BamSlice_Config.csv
+#BAMFILE=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/bams/G523_L.possorted_genome_bam.bam
+
+SAMPLE_ID=$1
+CB_CSV=$2
+BAMFILE=$3
 
 echo ""
 echo "********************"
@@ -40,7 +45,7 @@ echo "Running CellRanger-DNA Bamslice"
 date
 echo "********************"
 
-cellranger-dna bamslice --id=$SAMPLEID \
+cellranger-dna bamslice --id=$SAMPLE_ID \
                         --csv=$CB_CSV \
                         --bam=$BAMFILE \
                         --jobmode="/cluster/projects/pughlab/projects/INSPIRE_scRNAseq/src/slurm.template" \
