@@ -85,8 +85,8 @@ splitSize <- length(cells) ##output each cell into own csv
 print(paste0("Splitting cells into ", splitSize, " chunks..."))
 chunk <- function(x,n) split(x, factor(sort(rank(x)%%n)))
 cells <- chunk(cells, splitSize)
-names(cells) <- paste0("Chunk", as.numeric(names(cells))+1)
-
+#names(cells) <- paste0("Chunk", as.numeric(names(cells))+1)
+names(cells) <- cells
 
 
 ##############################################################
@@ -100,7 +100,7 @@ print(Sys.time())
 ### (1) The barcodes CSV files will each have one barcode entry per line,
 ### including the GEM well suffix (see GEM wells). Each such file will ### look something like: AAACGGGTCAAAGTGA-1
 ### output 1 csv file per chunk of cell barcodes
-
+print("Writing out individual cell csvs....")
 files <- c()
 for (i in 1:length(names(cells))){
   #print(names(cells)[i])
@@ -117,6 +117,7 @@ for (i in 1:length(names(cells))){
 }
 
 ### (2) master csv file pointing to csv above
+print("Writing out config csv....")
 mastercsv <- matrix(c(paste0(outFilePrefix, ".", names(cells)), files),
                     ncol = 2
                   )
@@ -130,3 +131,9 @@ write.table(mastercsv,
            row.names = FALSE,
            sep = ","
            )
+
+print("")
+print("********************")
+print("End of ExtractCellBarcodes_Seurat.r")
+print(Sys.time())
+print("********************")
