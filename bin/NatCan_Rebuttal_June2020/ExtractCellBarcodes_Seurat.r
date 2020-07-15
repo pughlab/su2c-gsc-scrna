@@ -104,7 +104,7 @@ print("Writing out individual cell csvs....")
 files <- c()
 for (i in 1:length(names(cells))){
   #print(names(cells)[i])
-  fileName <- paste0(getwd(), "/", outFilePrefix, "_CellBarcodes",  "_", names(cells)[i], ".csv")
+  fileName <- paste0(getwd(), "/", outFilePrefix,  "_", names(cells)[i], ".csv")
   files[i] <- fileName
   sub <- as.matrix(cells[[i]])
   write.table(sub,
