@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -t 10:00:00
-#SBATCH --mem=10G
+#SBATCH --mem=30G
 #SBATCH -p all
 #SBATCH -c 30
 #SBATCH -N 1
