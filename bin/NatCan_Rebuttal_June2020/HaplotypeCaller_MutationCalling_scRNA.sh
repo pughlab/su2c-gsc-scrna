@@ -1,7 +1,7 @@
 #!/bin/bash
 #SBATCH -t 10:00:00
-#SBATCH --mem=60G
-#SBATCH -p himem
+#SBATCH --mem=10G
+#SBATCH -p all
 #SBATCH -c 30
 #SBATCH -N 1
 #SBATCH --account=pughlab
