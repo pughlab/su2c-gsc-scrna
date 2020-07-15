@@ -16,6 +16,21 @@
 ### 6) Save Data
 ##############################################################
 
+##############################################################
+### EXAMPLE EXECUTION ON H4H
+### #!/bin/bash
+### #SBATCH --mem=60G
+### #SBATCH -p himem
+### #SBATCH -c 30
+### #SBATCH -N 1
+### #SBATCH --account=pughlab
+###
+### module load R/3.6.1
+###
+### Rscript /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/Seurat_Spectral_ClusterAlgorithms_GSCs.r
+###
+##############################################################
+
 options(stringsAsFactors = F)
 
 library("Seurat",
