@@ -136,7 +136,7 @@ module load R/3.2.2
 #######################
 # 3.1) Neftel et al.
 #######################
-/mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 0.5 \
+/mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 1 \
 --noise_filter 0.1 \
 --output_dir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel \
 --vis_bound_threshold " -1,1" \
@@ -147,7 +147,7 @@ module load R/3.2.2
 #######################
 # 3.2) Darmanis
 #######################
-/mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 0.5 \
+/mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 1 \
 --noise_filter 0.1 \
 --output_dir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Darmanis \
 --vis_bound_threshold " -1,1" \
