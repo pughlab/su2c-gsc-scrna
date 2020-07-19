@@ -37,7 +37,7 @@ module load gatk/4.0.5.1
 SEURAT_OBJ=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/G523_L_res.0.2.RData
 SAMPLE_ID=G523_L
 BAM_FILE=/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/MutationCalling/bams/G523_L.possorted_genome_bam.bam
-REF=cluster/projects/pughlab/references/cellranger_10x/refdata-cellranger-GRCh38-1.2.0/fasta/genome.fa
+REF=/cluster/projects/pughlab/references/cellranger_10x/refdata-cellranger-GRCh38-1.2.0/fasta/genome.fa
 
 WORKING_DIR=$(pwd)
 
@@ -96,7 +96,7 @@ echo '#####################################'
 echo '3) Mutation Calling Pipeline (HaplotypeCaller)'
 date
 echo '#####################################'
-### here we need to sbatch lots of miniscripts
+
 start=`date +%s`
 cd $WORKING_DIR/$SAMPLE_ID
 mkdir HaplotypeCaller
@@ -104,10 +104,12 @@ cd HaplotypeCaller
 
 ls $WORKING_DIR/${SAMPLE_ID}/bamslice/${SAMPLE_ID}/outs/subsets/*bam > cellbams.txt
 
+### here we need to sbatch lots of miniscripts
 for CELL_BAM in $(cat cellbams.txt); do
     #echo $CELL_BAM
     sbatch /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/HaplotypeCaller_MutationCalling_scRNA.sh $CELL_BAM $REF
 done
+
 
 ##############################################################
 echo '#####################################'
