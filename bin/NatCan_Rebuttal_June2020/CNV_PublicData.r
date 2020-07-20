@@ -34,6 +34,7 @@ library(Seurat)
 #library(infercnv) #v1.4 (cant re-install old version)
 library(AUCell)
 library(scater)
+library(data.table)
 
 ##############################################################
 # 2) Extract tumour and normal log matrices
@@ -210,3 +211,70 @@ meta <- cbind(meta, AUC)
 ### merge AUCell scores to seuart meta.data
 save.file <- paste0("./", name, "/", name, "_AUCell_Scores.rds")
 saveRDS(meta, file = save.file)
+
+
+##############################################################
+# 5) Clean up CNV calls
+##############################################################
+
+### Order the genes by genome position and order
+genePos <- read.table("GenePos_GRCh38.txt")
+head(genePos)
+
+### load in cnv data for cutoff=1
+#name <- "Darmanis"
+name <- "Neftel"
+input.file <- paste0("./", name, "/Cutoff_1/expression_post_viz_transform.txt")
+obs <- data.table::fread(input.file)
+obs <- data.frame(obs)
+rownames(obs) <- obs$V1
+obs <- obs[ , -1]
+obs[1:5, 1:5]
+dim(obs)
+max(obs)
+min(obs)
+
+#get all genes in CNV plot from genePos
+CNV.genes <- genePos[genePos$V1 %in% rownames(obs), ]
+CNV.genes <- CNV.genes[ ,1:2]
+rownames(CNV.genes) <- CNV.genes[,1]
+CNV.genes[,1] <- NULL
+colnames(CNV.genes) <- c("Chromosome")
+
+order <- c(grep("^1$", CNV.genes$Chromosome),
+grep("^2$", CNV.genes$Chromosome),
+grep("^3$", CNV.genes$Chromosome),
+grep("^4$", CNV.genes$Chromosome),
+grep("^5$", CNV.genes$Chromosome),
+grep("^6$", CNV.genes$Chromosome),
+grep("^7$", CNV.genes$Chromosome),
+grep("^8$", CNV.genes$Chromosome),
+grep("^9$", CNV.genes$Chromosome),
+grep("^10$", CNV.genes$Chromosome),
+grep("^11$", CNV.genes$Chromosome),
+grep("^12$", CNV.genes$Chromosome),
+grep("^13$", CNV.genes$Chromosome),
+grep("^14$", CNV.genes$Chromosome),
+grep("^15$", CNV.genes$Chromosome),
+grep("^16$", CNV.genes$Chromosome),
+grep("^17$", CNV.genes$Chromosome),
+grep("^18$", CNV.genes$Chromosome),
+grep("^19$", CNV.genes$Chromosome),
+grep("^20$", CNV.genes$Chromosome),
+grep("^21$", CNV.genes$Chromosome),
+grep("^22$", CNV.genes$Chromosome)
+           )
+
+CNV.genes$Number <- 1:length(CNV.genes$Chromosome)
+CNV.genes <- CNV.genes[match(order, CNV.genes$Number),]
+CNV.genes$Number <- NULL
+head(CNV.genes)
+
+##order expression matrix by this
+order <- rownames(CNV.genes)
+obs <- obs[order, ]
+save.file <- paste0("./", name, "/Cutoff_1/", name, "_Ordered_CNV_matrix.rds")
+saveRDS(obs, file = save.file)
+
+save.file2 <- paste0("./", name, "/Cutoff_1/", name, "_CNVgenes.rds")
+saveRDS(CNV.genes, file = save.file2)
