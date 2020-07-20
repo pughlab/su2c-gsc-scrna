@@ -31,7 +31,9 @@ setwd("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/
 # 1) Load packages
 ##############################################################
 library(Seurat)
-library(infercnv) #v1.4 (cant re-install old version)
+#library(infercnv) #v1.4 (cant re-install old version)
+library(AUCell)
+library(scater)
 
 ##############################################################
 # 2) Extract tumour and normal log matrices
@@ -78,6 +80,13 @@ write.table(matrix(as.character(ref.bc),nrow=1),
             quote = F
            )
 
+### (3) Save tumour only cells for AUCell
+cells <- c(rownames(seurat@meta.data[seurat@meta.data$label == "Malignant_GBM_Adult", ])
+)
+data <- seurat@assays$RNA@data[ ,cells] ### 23368 genes x 1582 cells
+meta <- seurat@meta.data[cells, ]
+saveRDS(data, file = "Darmanis_TumourOnly_LogCounts.rds")
+saveRDS(meta, file = "Darmanis_TumourOnly_meta.rds")
 
 ########################
 # 2.2) Neftel et al.,
@@ -123,6 +132,13 @@ write.table(matrix(as.character(ref.bc),nrow=1),
                        quote = F
                       )
 
+### (3) save tumour only expression matrix for AUCell
+cells <- c(rownames(meta.sub[meta.sub$label == "Malignant_GBM_Adult", ]))
+data <- seurat@assays$RNA@data[ ,cells]
+meta <- meta.sub[cells, ]
+saveRDS(data, file = "Neftel_TumourOnly_LogCounts.rds")
+saveRDS(meta, file = "Neftel_TumourOnly_meta.rds")
+
 
 ##############################################################
 # 3) Run InferCNV (v0.3) on Samwise (bash scripts below)
@@ -130,27 +146,67 @@ write.table(matrix(as.character(ref.bc),nrow=1),
 ### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA
 ### Have to run on Mordor to use same version of InferCNV
 ### Cutoff of 1 works well for smartsseq2 data
+### Transferred back to H4H
 
-module load R/3.2.2
+### module load R/3.2.2
 
 #######################
 # 3.1) Neftel et al.
 #######################
-/mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 1 \
---noise_filter 0.1 \
---output_dir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel \
---vis_bound_threshold " -1,1" \
---log_file Neftel.log.txt \
---ref /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_Reference_Barcodes.txt \
-/mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_TumourOligo_DGE.txt /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/GenePos_GRCh38.txt
+### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 1 \
+### --noise_filter 0.1 \
+### --output_dir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel \
+### --vis_bound_threshold " -1,1" \
+### --log_file Neftel.log.txt \
+### --ref /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_Reference_Barcodes.txt \
+### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_TumourOligo_DGE.txt /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/GenePos_GRCh38.txt
 
 #######################
 # 3.2) Darmanis
 #######################
-/mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 1 \
---noise_filter 0.1 \
---output_dir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Darmanis \
---vis_bound_threshold " -1,1" \
---log_file Darmanis.log.txt \
---ref /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Darmanis/Darmanis_Reference_Barcodes.txt \
-/mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Darmanis/Darmanis_TumourOligo_DGE.txt /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/GenePos_GRCh38.txt
+### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 1 \
+### --noise_filter 0.1 \
+### --output_dir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Darmanis \
+### --vis_bound_threshold " -1,1" \
+### --log_file Darmanis.log.txt \
+### --ref /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Darmanis/Darmanis_Reference_Barcodes.txt \
+### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Darmanis/Darmanis_TumourOligo_DGE.txt /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/GenePos_GRCh38.txt
+
+
+##############################################################
+# 4) Score public datasets with AUCell
+##############################################################
+
+### load gene signatures
+load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/AstrocyteScoring/input_data/AUCell_Signatures_Hypoxia.Rdata")
+sigs <- sigs[c("Developmental_GSC", "InjuryResponse_GSC")]
+
+### load public datasets
+darmanis <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Darmanis/Darmanis_TumourOnly_LogCounts.rds")
+darmanis_meta <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Darmanis/Darmanis_TumourOnly_meta.rds")
+
+neftel <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_TumourOnly_LogCounts.rds")
+neftel_meta <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_TumourOnly_meta.rds")
+
+### run AUCell
+name <- "Neftel"
+meta <- neftel_meta
+exprMatrix <- as.matrix(neftel)
+#name <- "Darmanis"
+#meta <- darmanis_meta
+#exprMatrix <- as.matrix(darmanis)
+exprMatrix[1:10, 1:10]
+dim(exprMatrix)
+cells_rankings <- AUCell_buildRankings(exprMatrix, nCores=1, plotStats=FALSE)
+cells_AUC <- AUCell_calcAUC(sigs,cells_rankings)
+cells_assignment <- AUCell_exploreThresholds(cells_AUC, plotHist=FALSE, assign=TRUE)
+
+AUC <- t(as.data.frame(cells_AUC@assays@data$AUC))
+colnames(AUC) <- paste0(colnames(AUC), "_AUC")
+AUC <- data.frame(AUC)
+print(AUC[1:2, 1:2])
+meta <- cbind(meta, AUC)
+
+### merge AUCell scores to seuart meta.data
+save.file <- paste0("./", name, "/", name, "_AUCell_Scores.rds")
+saveRDS(meta, file = save.file)
