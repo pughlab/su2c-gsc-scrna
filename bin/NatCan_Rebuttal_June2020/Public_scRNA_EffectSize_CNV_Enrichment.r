@@ -60,7 +60,6 @@ dat <- dat[!dat$ID == "LowLow", ]
 #}
 
 
-
 ##############################################################
 # 2) Compare CNV signal between bins
 ##############################################################
@@ -100,75 +99,15 @@ for(i in 1:length(chrs)){
 dev.off()
 
 
-
 ##############################################################
-# 3) Get Effect sizes for analysis WITHOUT hybrid
-##############################################################
-
-dat2 <- meta[ ,c("orig.ident", "RNA.GSC.c1_AUC", "RNA.GSC.c2_AUC")]
-colnames(dat2) <- c("Sample", "C1_AUC", "C2_AUC")
-
-dat2$Dev <- dat2$C1_AUC > 0.11 #AUCell cutoffs
-dat2$IR <- dat2$C2_AUC > 0.2 #AUCell cutodff
-dat2$ID <- paste0(dat2$Dev, dat2$IR)
-
-dat2$ID <- gsub("TRUEFALSE", "Dev", dat2$ID)
-dat2$ID <- gsub("FALSETRUE", "IR", dat2$ID)
-dat2$ID <- gsub("FALSEFALSE", "LowLow", dat2$ID)
-dat2$ID <- gsub("TRUETRUE", "HiHi", dat2$ID)
-head(dat2)
-
-#now remove hybrid cells
-dat2 <- dat2[!dat2$ID == "HiHi", ]
-dat2 <- dat2[!dat2$ID == "LowLow", ]
-table(dat2$ID)
-
-#filter arm.cnvs
-arm.CNVs_2 <- arm.CNVs[rownames(dat2), ]
-dim(arm.CNVs_2)
-
-chrs <- colnames(arm.CNVs_2)[grep("chr", colnames(arm.CNVs_2))]
-chrs
-boxplot.dat2 <- cbind(dat2, arm.CNVs_2)
-effect.size2 <- c()
-
-#pdf("With_Hybrids_chrArm_comparison.pdf", width = 4, height = 4)
-
-for(i in 1:length(chrs)){
-
-  chr <- chrs[i]
-  print(chr)
-
-  Dev <- boxplot.dat2[grep("Dev", boxplot.dat2$ID), chr]
-  IR <- boxplot.dat2[grep("IR", boxplot.dat2$ID), chr]
-
-  b <- cohen.d(Dev, #effect size
-        IR,
-        hedges.correction=TRUE
-       )
-
-       p <- ggviolin(boxplot.dat2,
-              x = "ID",
-              y = chr,
-              color = "ID",
-              palette = c("red", "black"),
-              add = "mean_sd",
-              main = paste0("Hedges g: ", round(b$estimate, 3), "\nMagnitude: ", b$magnitude),
-              legend = "none"
-              ) + stat_compare_means() #  Add p-value
-              effect.size2[i] <- b$estimate
-              #print(p)
-}
-
-#dev.off()
-##############################################################
-# 3) Plot Effect Size Across Chromosomes
+# 2) Plot Effect Size Across Chromosomes
 ##############################################################
 
-pdf("HYbrid_CNV_Enrichment_EffectSize.pdf", height = 5, width = 8)
+plot.file2 <- paste0(dataset, "_EffectSize.pdf")
+pdf(plot.file2, height = 5, width = 8)
 
-cols <-rep("grey", length(chrs))
-cols[c(12,17,28)] <- "red"
+#cols <-rep("grey", length(chrs))
+cols <- ifelse(abs(effect.size) > 0.8, "red", "grey")
 
 names(effect.size) <- chrs
 p <- barplot(effect.size,
@@ -180,16 +119,17 @@ p <- barplot(effect.size,
 abline(h=0.8, lty = 2, col = "black")
 abline(h=-0.8,  lty = 2, col = "black")
 abline(h=0)
-points(x = p, y = effect.size2 ) #add points from experiment without hybrid cells
+#points(x = p, y = effect.size2 ) #add points from experiment without hybrid cells
 
 dev.off()
 
 
 ### plot out ones with large effect size
-pdf("Hybrid_enrichedCNVs_largeEffectSize.pdf", width = 8, height = 3)
-ggviolin(boxplot.dat,
+plot.file3 <- paste0(dataset, "_GSC_chrArm_comparison.pdf")
+pdf(plot.file3, width = 8, height = 3)
+ggviolin(dat,
          x = "ID",
-         y = c("chr6q", "chr9p", "chr19p"),
+         y = c("chr6q_Avg", "chr9p_Avg", "chr19p_Avg"),
          combine = TRUE,
          color = "ID",
          palette = c("red", "black"),
