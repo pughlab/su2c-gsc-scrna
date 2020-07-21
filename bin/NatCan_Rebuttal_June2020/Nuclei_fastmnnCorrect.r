@@ -48,6 +48,10 @@ genes <- rownames(dat@assays$RNA@data)[!rownames(dat@assays$RNA@data) %in% ribo.
 
 dat_fMNN <- RunFastMNN(object.list = SplitObject(dat, split.by = "technology"), features = genes)
 
+####################
+# Save data
+####################
+
 ### isolate corrected expression Matrix
 exprMatrix <- data.matrix(dat_fMNN@tools$RunFastMNN@assays@data@listData$reconstructed)
 dim(exprMatrix)
@@ -55,3 +59,37 @@ saveRDS(exprMatrix, file = "GSCs_Tumour_LiveNuclei_fastMNN_correctedExpMat_ALLGE
 
 ## save fastMNN corrected seurat object
 saveRDS(dat_fMNN, file = "GSCs_Tumour_LiveNuclei_fastMNN_Seurat.rds")
+
+### isolate and save corrected PCA
+mnn <- data.matrix(dat_fMNN@reductions$mnn@cell.embeddings)
+saveRDS(mnn, file = "GSCs_Tumour_LiveNuclei_fastMNN_mnn_reducedDims.rds")
+
+##############################################################
+# 4) Score corrected gene matrix with Dev and IR signatures
+##############################################################
+### load corrected fastMNN expression matrix
+exprMatrix <- readRDS("GSCs_Tumour_LiveNuclei_fastMNN_correctedExpMat_ALLGENES.rds")
+
+### load gene signautres
+load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/AstrocyteScoring/input_data/AUCell_Signatures_Hypoxia.Rdata")
+sigs <- sigs[c("Developmental_GSC", "InjuryResponse_GSC")]
+
+### run AUCell
+cells_rankings <- AUCell_buildRankings(exprMatrix,
+                                       nCores=30,
+                                       plotStats=FALSE)
+
+cells_AUC <- AUCell_calcAUC(sigs,
+                            cells_rankings)
+
+cells_assignment <- AUCell_exploreThresholds(cells_AUC,
+                                             plotHist=FALSE,
+                                             assign=TRUE
+                                            )
+
+AUC <- t(as.data.frame(cells_AUC@assays@data$AUC))
+colnames(AUC) <- paste0(colnames(AUC), "_AUC")
+AUC <- data.frame(AUC)
+print(AUC[1:2, 1:2])
+
+saveRDS(AUC, file = "AUCell_CorrectedMat_fastMNN_Nuclei.rds")
