@@ -64,6 +64,7 @@ saveRDS(dat_fMNN, file = "GSCs_Tumour_LiveNuclei_fastMNN_Seurat.rds")
 mnn <- data.matrix(dat_fMNN@reductions$mnn@cell.embeddings)
 saveRDS(mnn, file = "GSCs_Tumour_LiveNuclei_fastMNN_mnn_reducedDims.rds")
 
+
 ##############################################################
 # 4) Score corrected gene matrix with Dev and IR signatures
 ##############################################################

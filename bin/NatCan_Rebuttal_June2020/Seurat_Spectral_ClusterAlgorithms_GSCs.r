@@ -392,3 +392,37 @@ saveRDS(sil_list, file = paste0(sample, "_Louvain_Spectral_silWidths.rds"))
 #saveRDS(sil_Spectral8, file = 'GSC_Sil_Spectral8.rds')
 #saveRDS(sil_Spectral9, file = 'GSC_Sil_Spectral9.rds')
 #saveRDS(sil_Spectral10, file = 'GSC_Sil_Spectral10.rds')
+
+
+##############################################################
+# 4) Differential Gene Expresion across solutions
+##############################################################
+
+file <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/BT127_L_res.0.1.RData"
+#file.path <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/"
+#files <- list.files(file.path, pattern = "_L_res")
+#load.files <- paste0(file.path, files)
+
+print("Load Seurat Object")
+load(file)
+sample <- as.character(unique(BTSC@meta.data$orig.ident))
+
+print("Load metadata")
+meta <- list.files()[grep(sample, list.files())]
+meta <- meta[grep("meta", meta)]
+meta <- readRDS(meta)
+BTSC <- AddMetaData(BTSC, metadata = meta) ### fuse to seurat obj
+
+DE <- list()
+
+cols <- colnames(BTSC@meta.data)[grep("^Cluster_", colnames(BTSC@meta.data))]
+
+
+for (i in 1:length(cols)){
+
+  print(paste0(i, "/", length(cols), "....", cols[i]))
+  print(Sys.time())
+  BTSC@ident <- as.factor(BTSC@meta.data[ ,cols[i]])
+  DE[[paste0(sample, "_", cols[i])]] <- FindAllMarkers(BTSC)
+
+}
