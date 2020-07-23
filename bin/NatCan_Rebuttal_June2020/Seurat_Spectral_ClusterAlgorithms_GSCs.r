@@ -397,14 +397,33 @@ saveRDS(sil_list, file = paste0(sample, "_Louvain_Spectral_silWidths.rds"))
 ##############################################################
 # 4) Differential Gene Expresion across solutions
 ##############################################################
+options(stringsAsFactors = F)
 
-file <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/BT127_L_res.0.1.RData"
-#file.path <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/"
-#files <- list.files(file.path, pattern = "_L_res")
-#load.files <- paste0(file.path, files)
+library("Seurat",
+        lib ="/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/bin"
+      ) #old version v2.3.4
+library(BBmisc)
+library(ggplot2)
+library(gridExtra)
+library(cluster)
+library(kernlab)
+library(optparse)
+
+option_list <- list(make_option("--file",
+                                type = "character",
+                                default = NULL,
+                                help = "path to seurat object",
+                                metavar= "character"
+                              ))
+opt_parser <- OptionParser(option_list=option_list)
+opt <- parse_args(opt_parser)
+file <- opt$file
+
+#file <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/BT127_L_res.0.1.RData"
 
 print("Load Seurat Object")
 load(file)
+BTSC <- UpdateSeuratObject(BTSC)
 sample <- as.character(unique(BTSC@meta.data$orig.ident))
 
 print("Load metadata")
@@ -422,7 +441,10 @@ for (i in 1:length(cols)){
 
   print(paste0(i, "/", length(cols), "....", cols[i]))
   print(Sys.time())
-  BTSC@ident <- as.factor(BTSC@meta.data[ ,cols[i]])
-  DE[[paste0(sample, "_", cols[i])]] <- FindAllMarkers(BTSC)
+  BTSC <- SetIdent(BTSC, value = cols[i])
+  DE[[paste0(sample, ".", cols[i])]] <- FindAllMarkers(BTSC)
 
 }
+
+save.file <- paste0(sample, "_DE_Markers.rds")
+saveRDS(DE, file = save.file)
