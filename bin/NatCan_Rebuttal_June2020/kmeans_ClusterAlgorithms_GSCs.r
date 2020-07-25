@@ -40,7 +40,6 @@ library(kernlab)
 library(optparse)
 library(factoextra)
 library(NbClust)
-library(leiden)
 
 
 ##############################################################
@@ -61,8 +60,7 @@ print("")
 print("*****************")
 print(files[i])
 print("*****************")
-ll <- load.files[i]
-load(ll) #load GSC Data
+load(load.files[i]) #load GSC Data
 names(BTSC@ident) <- rownames(BTSC@meta.data)
 
 #############################################################
@@ -90,7 +88,7 @@ fviz_nbclust(a)
 dev.off()
 
 print("Running k-means.....")
-print(a$table(a$Best.partition))
+print(table(a$Best.partition))
 col.name <- paste0("kmeans_", length(table(a$Best.partition)))
 meta[ ,col.name] <- a$Best.partition
 
