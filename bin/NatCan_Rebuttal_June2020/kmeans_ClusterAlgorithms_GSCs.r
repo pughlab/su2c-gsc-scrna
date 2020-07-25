@@ -26,7 +26,7 @@
 ###
 ### module load R/3.6.1
 ###
-### Rscript /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/Seurat_Spectral_ClusterAlgorithms_GSCs.r
+### Rscript /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/kmeans_clustering_GSCs.r
 ###
 ##############################################################
 options(stringsAsFactors = F)
@@ -106,3 +106,7 @@ sil_list[[sample]] <- summary(sil)$clus.avg.widths
 meta_combo[[sample]] <- meta
 
 }
+
+print("Saving data")
+saveRDS(meta_combo, file = "kmeans_metadata.rds")
+saveRDS(sil_list, file = "kmeans_silwidths.rds")
