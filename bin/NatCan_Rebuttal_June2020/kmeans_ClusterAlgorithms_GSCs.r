@@ -61,7 +61,8 @@ print("")
 print("*****************")
 print(files[i])
 print("*****************")
-load(load.files[i]) #load GSC Data
+ll <- load.files[i]
+load(ll) #load GSC Data
 names(BTSC@ident) <- rownames(BTSC@meta.data)
 
 #############################################################
