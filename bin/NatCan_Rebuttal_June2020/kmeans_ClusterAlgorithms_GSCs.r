@@ -82,9 +82,10 @@ print("Determining optimal k.....")
 pc.dat <- BTSC@dr$pca@cell.embeddings[ ,dims]
 a <- NbClust(data = pc.dat,  distance = "euclidean",
         min.nc = 2, max.nc = 8, method = "kmeans")
-k.file <- paste0(sample, "kmeans_optimalCluster.pdf")
+
+k.file <- paste0(sample, "_kmeans_optimalCluster.pdf")
 pdf(k.file)
-fviz_nbclust(a)
+print(fviz_nbclust(a))
 dev.off()
 
 print("Running k-means.....")
