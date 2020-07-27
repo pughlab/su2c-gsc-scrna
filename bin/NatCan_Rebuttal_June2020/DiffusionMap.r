@@ -114,15 +114,21 @@ if (downsample > 0){
     ### get list of cell barcodes with downsampling
     cells <- c()
     samples <- as.character(unique(dat@ident))
+
     for (i in 1:length(samples)){
       dat_sub <- dat@data[ ,grepl(samples[i], colnames(dat@data))]
-      cells <- c(cells, sample(colnames(dat_sub), downsample, replace = F))
+      if(ncol(dat_sub) > downsample){
+              cells <- c(cells, sample(colnames(dat_sub), downsample, replace = F))
+      } else if (ncol(dat_sub) <= downsample){ #if not enough cell just use all
+          cells <- c(cells, colnames(dat_sub))
+      }
     }
 
     print(paste0("Downsampled to ", length(cells), " cells....."))
     dat <- SubsetData(dat,
                       cells.use = cells
                       )
+    print(table(dat@ident))
 
 }
 
