@@ -159,13 +159,6 @@ print("Save")
 print(Sys.time())
 print("****************************")
 
-print("Plotting....")
-### output plot
-plot.name <- paste0(outName, "_", ncol(dat@data),"cells", "_DM.pdf")
-pdf(plot.name, height = 8, width = 10)
-DMPlot(dat, group.by = "SampleID")
-dev.off()
-
 print("Saving....")
 ### save metadata
 meta <- dat@meta.data
@@ -177,6 +170,16 @@ saveRDS(meta, meta.file)
 seurat.file <- paste0(outName, "_", ncol(dat@data),"cells", "_DM_Seurat.rds")
 print(seurat.file)
 saveRDS(dat, file = seurat.file)
+
+
+print("Plotting....")
+### output plot
+plot.name <- paste0(outName, "_", ncol(dat@data),"cells", "_DM.pdf")
+pdf(plot.name, height = 8, width = 10)
+#DMPlot(dat, group.by = "SampleID")
+DMPlot(dat)
+dev.off()
+
 
 
 ##############################################################

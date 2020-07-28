@@ -110,3 +110,36 @@ meta_combo[[sample]] <- meta
 print("Saving data")
 saveRDS(meta_combo, file = "kmeans_metadata.rds")
 saveRDS(sil_list, file = "kmeans_silwidths.rds")
+
+
+
+##############################################################
+### RUN DE ON KMEANS CLUSTERS
+##############################################################
+
+options(stringsAsFactors = F)
+
+library(Seurat)
+
+file.path <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/"
+files <- list.files(file.path, pattern = "_L_res")
+load.files <- paste0(file.path, files)
+
+opt.k <- readRDS("kmeans_metadata.rds")
+samples <- names(opt.k)
+DE <- list()
+
+
+for (i in 1:length(samples)){
+
+  print(samples[i])
+  ### load seurat object
+  load(load.files[grep(samples[i], load.files)])
+  BTSC <- UpdateSeuratObject(BTSC)
+  sub <- opt.k[[samples[i]]]
+  BTSC <- AddMetaData(BTSC, metadata = sub)
+  BTSC <- SetIdent(BTSC, value = colnames(BTSC@meta.data)[grep("kmeans", colnames(BTSC@meta.data))])
+  DE[[samples[i]]] <- FindAllMarkers(BTSC)
+}
+
+saveRDS(DE, file = "kmeans_optsolution_DEmarkers.rds")
