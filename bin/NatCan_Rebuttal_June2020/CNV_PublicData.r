@@ -141,6 +141,63 @@ saveRDS(data, file = "Neftel_TumourOnly_LogCounts.rds")
 saveRDS(meta, file = "Neftel_TumourOnly_meta.rds")
 
 
+########################
+# 2.3) Wang et al.,
+########################
+seurat <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/data/public_data/Wang/Wang_scRNA_full_seurat.rds")
+
+### add labels from Owens analysis to data
+seurat@meta.data$cluster <- gsub(0, "Tumour", seurat@meta.data$cluster)
+seurat@meta.data$cluster <- gsub(1, "Tumour", seurat@meta.data$cluster)
+seurat@meta.data$cluster <- gsub(2, "Tumour", seurat@meta.data$cluster)
+seurat@meta.data$cluster <- gsub(3, "Macrophage", seurat@meta.data$cluster)
+seurat@meta.data$cluster <- gsub(4, "Oligodendrocytes", seurat@meta.data$cluster)
+seurat@meta.data$cluster <- gsub(5, "Tumour", seurat@meta.data$cluster)
+seurat@meta.data$cluster <- gsub(6, "Endothelial", seurat@meta.data$cluster)
+
+cells <- c(rownames(seurat@meta.data[seurat@meta.data$cluster == "Tumour", ]),
+        rownames(seurat@meta.data[seurat@meta.data$cluster == "Oligodendrocytes", ]) ###only want normal from matched tumours
+           )
+
+data <- seurat@data[ ,cells] ### 15794 genes x  5827 cells
+
+### used for inferCNV input:
+### (1) lognormal matrix of tumour+reference cells
+DGE.name <- "Wang_scRNA_TumourOligo_DGE.txt"
+write.table(as.matrix(data),
+                   file = DGE.name,
+                   sep = "\t",
+                   col.names = T,
+                   row.names = T,
+                   quote = F
+                  )
+
+### (2) comman delimited refernece cell barcode file
+ref.bc <- c(rownames(meta.sub[meta.sub$label == "Oligodendrocytes", ]))
+write.table(matrix(as.character(ref.bc),nrow=1),
+            file = "Wang_scRNA_Reference_Barcodes.txt",
+            sep=",",
+            row.names=FALSE,
+            col.names=FALSE,
+            quote = F
+            )
+
+
+########################
+# 2.4) Richards et al.,
+########################
+
+
+loadRData <- function(fileName){
+    load(fileName)
+    get(ls()[ls() != "fileName"])
+}
+
+
+/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/data/SU2C_Live_GBM_AllCells_Seurat_Oct2019.Rdata
+
+
+
 ##############################################################
 # 3) Run InferCNV (v0.3) on Samwise (bash scripts below)
 ##############################################################
