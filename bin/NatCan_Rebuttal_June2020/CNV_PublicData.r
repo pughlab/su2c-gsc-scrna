@@ -182,6 +182,13 @@ write.table(matrix(as.character(ref.bc),nrow=1),
             quote = F
             )
 
+### (3) save tumour only expression matrix for AUCell
+cells <- c(rownames(seurat@meta.data[seurat@meta.data$cluster == "Tumour", ]))
+data <- seurat@data[ ,cells]
+meta <- seurat@meta.data[cells, ]
+saveRDS(data, file = "Wang_TumourOnly_LogCounts.rds")
+saveRDS(meta, file = "Wang_TumourOnly_meta.rds")
+
 
 ########################
 # 2.4) Richards et al.,
@@ -220,6 +227,13 @@ write.table(matrix(as.character(ref.bc),nrow=1),
             col.names=FALSE,
             quote = F
             )
+
+### (3) save tumour only expression matrix for AUCell
+cells <- c(rownames(seurat@meta.data[seurat@meta.data$CellType == "Tumour", ]))
+data <- seurat@data[ ,cells]
+meta <- seurat@meta.data[cells, ]
+saveRDS(data, file = "Richards_TumourOnly_LogCounts.rds")
+saveRDS(meta, file = "Richards_TumourOnly_meta.rds")
 
 
 ##############################################################
@@ -292,10 +306,16 @@ darmanis_meta <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manu
 neftel <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_TumourOnly_LogCounts.rds")
 neftel_meta <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_TumourOnly_meta.rds")
 
+wang <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Wang/Wang_TumourOnly_LogCounts.rds")
+wang_meta <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Wang/Wang_TumourOnly_meta.rds")
+
+richards <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Richards/Richards_TumourOnly_LogCounts.rds")
+richards_meta <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Richards/Richards_TumourOnly_meta.rds")
+
 ### run AUCell
-name <- "Neftel"
-meta <- neftel_meta
-exprMatrix <- as.matrix(neftel)
+name <- "Wang"
+meta <- wang_meta
+exprMatrix <- as.matrix(wang)
 #name <- "Darmanis"
 #meta <- darmanis_meta
 #exprMatrix <- as.matrix(darmanis)
@@ -326,8 +346,9 @@ head(genePos)
 
 ### load in cnv data for cutoff=1
 #name <- "Darmanis"
-name <- "Neftel"
-input.file <- paste0("./", name, "/Cutoff_1/expression_post_viz_transform.txt")
+name <- "Richards"
+#input.file <- paste0("./", name, "/Cutoff_1/expression_post_viz_transform.txt")
+input.file <- paste0("./", name, "/cutoff_0.1/expression_post_viz_transform.txt")
 obs <- data.table::fread(input.file)
 obs <- data.frame(obs)
 rownames(obs) <- obs$V1
@@ -376,8 +397,10 @@ head(CNV.genes)
 ##order expression matrix by this
 order <- rownames(CNV.genes)
 obs <- obs[order, ]
-save.file <- paste0("./", name, "/Cutoff_1/", name, "_Ordered_CNV_matrix.rds")
+#save.file <- paste0("./", name, "/Cutoff_1/", name, "_Ordered_CNV_matrix.rds")
+save.file <- paste0("./", name, "/cutoff_0.1/", name, "_Ordered_CNV_matrix.rds")
 saveRDS(obs, file = save.file)
 
-save.file2 <- paste0("./", name, "/Cutoff_1/", name, "_CNVgenes.rds")
+#save.file2 <- paste0("./", name, "/Cutoff_1/", name, "_CNVgenes.rds")
+save.file2 <- paste0("./", name, "/cutoff_0.1/", name, "_CNVgenes.rds")
 saveRDS(CNV.genes, file = save.file2)
