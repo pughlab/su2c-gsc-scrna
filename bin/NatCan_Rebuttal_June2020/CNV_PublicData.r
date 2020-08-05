@@ -159,7 +159,7 @@ cells <- c(rownames(seurat@meta.data[seurat@meta.data$cluster == "Tumour", ]),
         rownames(seurat@meta.data[seurat@meta.data$cluster == "Oligodendrocytes", ]) ###only want normal from matched tumours
            )
 
-data <- seurat@data[ ,cells] ### 15794 genes x  5827 cells
+data <- seurat@data[ ,cells] ### 15794 genes x 15827 cells
 
 ### used for inferCNV input:
 ### (1) lognormal matrix of tumour+reference cells
@@ -173,7 +173,7 @@ write.table(as.matrix(data),
                   )
 
 ### (2) comman delimited refernece cell barcode file
-ref.bc <- c(rownames(meta.sub[meta.sub$label == "Oligodendrocytes", ]))
+ref.bc <- c(rownames(seurat@meta.data[seurat@meta.data$cluster == "Oligodendrocytes", ]))
 write.table(matrix(as.character(ref.bc),nrow=1),
             file = "Wang_scRNA_Reference_Barcodes.txt",
             sep=",",
@@ -187,15 +187,39 @@ write.table(matrix(as.character(ref.bc),nrow=1),
 # 2.4) Richards et al.,
 ########################
 
-
 loadRData <- function(fileName){
     load(fileName)
     get(ls()[ls() != "fileName"])
 }
 
+seurat <- loadRData("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/data/SU2C_Live_GBM_AllCells_Seurat_Oct2019.Rdata")
 
-/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/data/SU2C_Live_GBM_AllCells_Seurat_Oct2019.Rdata
+cells <- c(rownames(seurat@meta.data[seurat@meta.data$CellType == "Tumour", ]),
+        rownames(seurat@meta.data[seurat@meta.data$CellType == "NormalBrain", ]) ###only want normal from matched tumours
+           )
 
+data <- seurat@data[ ,cells] ### 17647 x 17982 cells
+
+### used for inferCNV input:
+### (1) lognormal matrix of tumour+reference cells
+DGE.name <- "Richards_scRNA_TumourOligo_DGE.txt"
+write.table(as.matrix(data),
+                   file = DGE.name,
+                   sep = "\t",
+                   col.names = T,
+                   row.names = T,
+                   quote = F
+                  )
+
+### (2) comman delimited refernece cell barcode file
+ref.bc <- c(rownames(seurat@meta.data[seurat@meta.data$CellType == "NormalBrain", ]))
+write.table(matrix(as.character(ref.bc),nrow=1),
+            file = "Richards_scRNA_Reference_Barcodes.txt",
+            sep=",",
+            row.names=FALSE,
+            col.names=FALSE,
+            quote = F
+            )
 
 
 ##############################################################
@@ -218,6 +242,28 @@ loadRData <- function(fileName){
 ### --log_file Neftel.log.txt \
 ### --ref /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_Reference_Barcodes.txt \
 ### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Neftel/Neftel_TumourOligo_DGE.txt /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/GenePos_GRCh38.txt
+
+#######################
+# 3.3) Wang
+#######################
+### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 0.5 \
+### --noise_filter 0.1 \
+### --output_dir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Wang \
+### --vis_bound_threshold " -1,1" \
+### --log_file Wang_scRNA.log.txt \
+### --ref /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Wang/Wang_scRNA_Reference_Barcodes.txt \
+### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Wang/Wang_TumourOligo_DGE.txt /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/GenePos_GRCh38.txt
+
+#######################
+# 3.4) Richards
+#######################
+### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript/InferCNV/inferCNV/scripts/inferCNV.R --cutoff 0.5 \
+### --noise_filter 0.1 \
+### --output_dir /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Richards \
+### --vis_bound_threshold " -1,1" \
+### --log_file Richards.log.txt \
+### --ref /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Richards/Richards_scRNA_Reference_Barcodes.txt \
+### /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/Richards/Richards_scRNA_TumourOligo_DGE.txt /mnt/work1/users/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/CNV_public_scRNA/GenePos_GRCh38.txt
 
 #######################
 # 3.2) Darmanis
