@@ -56,6 +56,7 @@ mkdir $SAMPLE_ID
 mkdir $SAMPLE_ID/cell_barcodes
 cd ./$SAMPLE_ID/cell_barcodes/
 
+###work on the extract flag and column
 Rscript /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/ExtractCellBarcodes_Seurat.r --seurat.obj $SEURAT_OBJ --outFilePrefix $SAMPLE_ID
 wait
 
