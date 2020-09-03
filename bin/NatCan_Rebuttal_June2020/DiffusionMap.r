@@ -143,10 +143,14 @@ print(Sys.time())
 print("****************************")
 
 print(paste0("Running Diffusion map on ", ncol(dat@data), " cells....."))
+pc.genes <- dat@calc.params$RunPCA$pc.genes
 dat <- RunDiffusion(dat,
-                    genes.use = dat@var.genes, #to save time (~2765 genes)
+                    genes.use = pc.genes,
+                    #genes.use = dat@var.genes, #to save time (~2765 genes)
                     #dims.use = dat@calc.params$RunTSNE$dims.use
-                    dims.use = 1:10
+                    dims.use = 1:10,
+                    #max.dim = 2
+                    max.dim = 5           
                    )
 
 
