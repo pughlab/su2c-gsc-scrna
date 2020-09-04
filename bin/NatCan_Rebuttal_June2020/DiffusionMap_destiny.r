@@ -1,10 +1,10 @@
 ##############################################################
-#               Run Diffusion Map SU2C data                  #
+#     Run Diffusion Map SU2C data using destiny R package    #
 #                         L.Richards                         #
-#                         July 2020                          #
+#                         Sept 2020                          #
 ##############################################################
-### Owen was running out of memory, lets see what superhimem can do
-### /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/DiffusionMap
+### Destiny: https://bioconductor.org/packages/release/bioc/html/destiny.html
+### /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/DiffusionMap/destiny
 
 ##############################################################
 ### GENERAL OVERVIEW OF THIS SCRIPT
@@ -25,12 +25,13 @@
 ##
 ## module load R/3.6.1
 ##
-## Rscript /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/DiffusionMap.r --data /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata \
-##  --outName GSC \
-##  --downsample 10
+## Rscript /cluster/home/lrichard/github/SU2C_GSC_scRNA/bin/NatCan_Rebuttal_June2020/DiffusionMap_destiny.r --data /cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata \
+##  --outName GSC_destiny \
+##  --downsample 100
 ##############################################################
 
 library(optparse)
+library(destiny) #v3.0.1
 suppressMessages(library("Seurat",
                          lib ="/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/bin/")
                 ) #v2.3.4 needed to run Diffusion
@@ -81,10 +82,9 @@ print(paste0("Output file prefix: ", outName))
 print(paste0("Downsample cells: ", downsample))
 
 ######## DEVELOPMENT
-#data <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata"
-#outName <- "GSCs"
-#downsample <- 10
-
+data <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata"
+outName <- "GSCs_desinty"
+downsample <- 100
 
 
 ##############################################################
@@ -133,26 +133,32 @@ if (downsample > 0){
 }
 
 
-
 ##############################################################
 # 3) Run Diffusion Map
 ##############################################################
 print("****************************")
-print("Run Diffusion Map")
+print("Run Diffusion Map using Destiny")
 print(Sys.time())
 print("****************************")
 
 print(paste0("Running Diffusion map on ", ncol(dat@data), " cells....."))
 pc.genes <- dat@calc.params$RunPCA$pc.genes
-#if genes.use is set, run on genes and not reduced dim
-dat <- RunDiffusion(dat,
-                    genes.use = pc.genes,
-                    #genes.use = dat@var.genes, #to save time (~2765 genes)
-                    #dims.use = dat@calc.params$RunTSNE$dims.use
-                    #dims.use = 1:10,
-                    #max.dim = 2
-                    max.dim = 5
-                   )
+exprMatrix <- as.matrix(dat@data[pc.genes, ])
+dim(exprMatrix)
+### run diffusion map using destiny package
+distance <-
+sigma <-
+dm <- DiffusionMap(exprMatrix,
+                   suppress_dpt = TRUE,
+                   n_eigs = 5,
+                   k = 30, #same as seurat clustering
+                   verbose = TRUE,
+                   distance = "euclidean", #can also be "cosine" and "rankcor",
+                  )
+
+pdf("DiffusionMap_2900cells_euclidean.pdf")
+plot(dm)
+dev.off()
 
 
 
