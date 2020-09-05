@@ -68,7 +68,20 @@ option_list <- list(make_option("--data",
                                 default = NULL,
                                 help = "Downsample to this many cells per ID; if you dont want to downsample enter 0",
                                metavar= "interger"
-                            ))
+                            ),
+                      make_option("--distance",
+                                  type = "character",
+                                  default = NULL,
+                                  help = "euclidean, cosine or rankcor",
+                                  metavar= "character"
+                                ),
+                      make_option("--runDPT",
+                                  type = "character",
+                                  default = NULL,
+                                  help = "TRUE, FALSE",
+                                  metavar= "character"
+                                  )
+                        )
 
 opt_parser <- OptionParser(option_list=option_list)
 opt <- parse_args(opt_parser)
@@ -76,16 +89,19 @@ opt <- parse_args(opt_parser)
 data <- opt$data
 outName <- opt$outName
 downsample <- opt$downsample
+distance <- opt$distance
+runDPT <- opt$runDPT
 
 print(paste0("Dataset: ",data))
 print(paste0("Output file prefix: ", outName))
 print(paste0("Downsample cells: ", downsample))
 
 ######## DEVELOPMENT
-data <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata"
-outName <- "GSCs_desinty"
-downsample <- 100
-
+#data <- "/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata"
+#outName <- "GSCs_desinty"
+#downsample <- 10
+#distance <- "euclidean"
+#runDPT <- "TRUE"
 
 ##############################################################
 # 2) Load and Reformat Data
@@ -140,26 +156,25 @@ print("****************************")
 print("Run Diffusion Map using Destiny")
 print(Sys.time())
 print("****************************")
-
 print(paste0("Running Diffusion map on ", ncol(dat@data), " cells....."))
+
 pc.genes <- dat@calc.params$RunPCA$pc.genes
 exprMatrix <- as.matrix(dat@data[pc.genes, ])
-dim(exprMatrix)
+exprMatrix <- t(exprMatrix)
+print(dim(exprMatrix))
+meta <- dat@meta.data
 ### run diffusion map using destiny package
-distance <-
-sigma <-
 dm <- DiffusionMap(exprMatrix,
-                   suppress_dpt = TRUE,
                    n_eigs = 5,
-                   k = 30, #same as seurat clustering
-                   verbose = TRUE,
-                   distance = "euclidean", #can also be "cosine" and "rankcor",
-                  )
+                   distance = distance
+                )
+meta <- cbind(meta, dm@eigenvectors)
 
-pdf("DiffusionMap_2900cells_euclidean.pdf")
-plot(dm)
-dev.off()
-
+if (runDPT == "TRUE"){
+    print("Running DPT on Diffusion Map results")
+    print(Sys.time())
+    dpt <- DPT(dm)
+}
 
 
 ##############################################################
@@ -170,27 +185,26 @@ print("Save")
 print(Sys.time())
 print("****************************")
 
-print("Saving....")
-### save metadata
-meta <- dat@meta.data
-meta <- cbind(meta, dat@dr$dm@cell.embeddings) #add DM coordinates
-meta.file <- paste0(outName, "_", ncol(dat@data),"cells", "_DM_Metadata.rds")
+print("Saving destiny object....")
+dm.file <- paste0(outName, "_", distance, "_DM.rds")
+print(dm.file)
+saveRDS(dm, file = dm.file)
+
+if (runDPT == "TRUE"){
+  print("Saving destiny object....")
+  dpt.file <- paste0(outName, "_", distance, "_DPT.rds")
+  print(dpt.file)
+  saveRDS(dpt, file = dpt.file)
+}
+
+print("Saving meta.data....")
+meta.file <- paste0(outName, "_", distance, "_", "_destiny_DM_Metadata.rds")
 print(meta.file)
 saveRDS(meta, meta.file)
 ### save seurat obj
-seurat.file <- paste0(outName, "_", ncol(dat@data),"cells", "_DM_Seurat.rds")
+seurat.file <- paste0(outName, "_", distance, "_", "_destiny_DM_Seurat.rds")
 print(seurat.file)
 saveRDS(dat, file = seurat.file)
-
-
-print("Plotting....")
-### output plot
-plot.name <- paste0(outName, "_", ncol(dat@data),"cells", "_DM.pdf")
-pdf(plot.name, height = 8, width = 10)
-#DMPlot(dat, group.by = "SampleID")
-DMPlot(dat)
-dev.off()
-
 
 
 ##############################################################
