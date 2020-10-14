@@ -4,7 +4,7 @@
 
 Glioblastomas (GBM) harbour diverse populations of cells, including a rare subpopulation of glioblastoma stem cells (GSCs) that drive tumorigenesis. To characterize functional diversity within the tumor-initiating fraction of GBM, we performed single-cell RNA-sequencing on >69,000 GSCs cultured from the tumors of 26 patients. We observed a high degree of inter- and intra-GSC transcriptional heterogeneity that could not be fully explained by somatic alterations at the DNA level. Instead, we found GSCs mapped along a  transcriptional gradient spanning two cellular states reminiscent of normal neural developmental and inflammatory wound response processes. Genome-wide CRISPR/Cas9 drop-out screens recapitulated this observation, as essential genes within each GSC comprised a mixture of these states depending on the position along this axis as measured by gene expression profiling. Further single-cell RNA-sequencing of patient tumors found the majority of cancer cells organize along an astrocyte maturation gradient orthogonal to the GSC gradient yet retained expression of founder transcriptional programs found in GSCs. Our work supports a model whereby GBM heterogeneity is rooted in a fundamental GSC-based neural tissue regeneration and wound response transcriptional continuum.
 
-## Where can I find the data?
+### Where can I find the data?
 Link to BroadPortal
 [Link to EGA]
 
@@ -14,7 +14,7 @@ XX/XX cells from primary tumours are malignant, XXX are normal brain, and XXX ar
 X samples have matched BTSC culture and primary GBM.   
   
 
-## Who do I contact?
+### Who do I contact?
 Laura Richards (lauram.richards@mail.utoronto.ca) & Trevor Pugh (trevor.pugh@utoronto.ca)  
    
 
