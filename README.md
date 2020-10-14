@@ -8,7 +8,7 @@ Glioblastomas (GBM) harbour diverse populations of cells, including a rare subpo
 #
 ### Where can I find the raw data?
 
-| Data type | Cohort | File type | Location | 
+| Data type | Sample Cohort | File type | Location | 
 | ----- | ----- |----- |----- |
 | Single cell RNA-sequencing | GSCs (XXX cells from 29 samples) | <p>fastq<br>Processed data</p> | <p>EGA<br>Broad Portal</p> | 
 | Single cell RNA-sequencing | Tumours (XXXX cells from 7 samples) | <p>fastq<br>Processed data</p> | <p>EGA<br>Broad Portal</p> |
