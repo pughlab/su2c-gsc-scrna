@@ -1,26 +1,28 @@
-## Supporting code
+
   
   
-### Single cell RNA-sequencing
+## Single cell RNA-sequencing
+
 | Script | Description | 
 |-----|-----|
+|XXX | XXXX |
 
-### 2.0 Bulk RNA-sequencing
-| Script | Description | 
-|-----|-----|
-
-
-### 3.0 Whole genome sequencing
-| Script | Description | 
-|-----|-----|
-
-
-### 4.0 CRISPR
+## Bulk RNA-sequencing
 | Script | Description | 
 |-----|-----|
 
 
-## 5.0 Functional and experimental
+## Whole genome sequencing
+| Script | Description | 
+|-----|-----|
+
+
+## CRISPR
+| Script | Description | 
+|-----|-----|
+
+
+## Functional and experimental
 | Script | Description | 
 |-----|-----|
 
