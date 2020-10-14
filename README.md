@@ -1,4 +1,4 @@
-##Gradient of developmental and injury-response transcriptional states define functional vulnerabilities underpinning glioblastoma heterogeneity
+## Gradient of developmental and injury-response transcriptional states define functional vulnerabilities underpinning glioblastoma heterogeneity
 
 Laura M. Richards*, Owen K.W. Whitley*, Graham MacLeod, Florence M.G. Cavalli, Fiona J. Coutinho , Julia E. Jaramillo, Nataliia Svergun, Mazdak Riverin, Danielle C. Croucher, Michelle Kushida, Kenny Yu, Paul Guilhamon, Naghmeh Rastegar, Moloud Ahmadi, Danielle A. Bozek, Naijin Li, Erika Luis, Nicole I. Park, Julian Spears, Michael D. Cusimano, Benjamin Haibe-Kains, Mathieu Lupien, H. Artee Luchman, Samuel Weiss, Stephane Angers, Peter B. Dirks*, Gary D. Bader*, Trevor J. Pugh*. *Nature Cancer* (2020): [insert link to paper once published]()
 
