@@ -2,9 +2,10 @@
 &nbsp;
 &nbsp;
 
-### Single cell RNA-sequencing
-./scrnaseq
-|Script | Description | 
+ **Single cell RNA-sequencing** 
+ ./scrna-seq
+
+||| 
 |-----|-----|
 |XXX | XXXX |
 
