@@ -12,12 +12,10 @@ Glioblastomas (GBM) harbour diverse populations of cells, including a rare subpo
 | Single cell RNA-sequencing | GSCs (XXX cells from 29 samples) | fastq | 
 | Single cell RNA-sequencing | Tumours (XXXX cells from 7 samples) | fastq | 
 | Single nuclei RNA-sequencing | Tumours (XXX cells from 10 samples) | fastq | 
-| Bulk RNA-sequencing | GSCS (72 samples) | fastq | | 
-
-XX cells from 29 BTSC culturers, derived from XX patients.     
-XX cells from 24 primary GBM samples from 7 patients (some tumours have multiple regions/sample)  
-XX/XX cells from primary tumours are malignant, XXX are normal brain, and XXX are of immune origin.   
-X samples have matched BTSC culture and primary GBM.   
+|XXXx 
+Bulk RNA-sequencing | GSCs (72 samples) | fastqzzz| | 
+| Whole genome sequencing | 
+| 
   
 #
 ### Who do I contact?
