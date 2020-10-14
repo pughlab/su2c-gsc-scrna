@@ -21,7 +21,7 @@ Glioblastomas (GBM) harbour diverse populations of cells, including a rare subpo
   
 #
 ### Who do I contact?
-Laura Richards (lauram.richards@mail.utoronto.ca) & Trevor Pugh (trevor.pugh@utoronto.ca)  
+Drs. Trevor Pugh (trevor.pugh@utoronto.ca) & Gary Bader (gary.bader@utoronto.ca)
    
 
 
