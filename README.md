@@ -15,7 +15,7 @@ Glioblastomas (GBM) harbour diverse populations of cells, including a rare subpo
 | Single nuclei RNA-sequencing | Tumours (XXX cells from 10 samples) | fastq | 
 | Public single cell/nuclei RNA-seq ||
 | Bulk RNA-sequencing | GSCs (72 samples) | fastq | | 
-| Whole genome sequencing | GSCs + matched normal blood (20 samples) | fastqs | 
+| Whole genome sequencing | GSCs (20 samples) | fastqs | 
 | CRISPR screens | GSCs (11 samples) | <p>raw BF<br>qBF</p>| 
 | Clinical and experimental metadata | 
   
