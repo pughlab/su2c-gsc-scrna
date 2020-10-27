@@ -1,0 +1,211 @@
+---
+title: "Clustering and Differential Expression, RNA-seq, SU2C adult GBM lines"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+## Setup Directories + Load Data
+
+```{r, results='hide'}
+## get required packages
+library(SummExpDR)
+library(DESeq2)
+library(SummarizedExperiment)
+## Setup directories
+top.dir <- '/home/owenwhitley/projects/su2c_v2/'
+scripts.dir <- file.path(top.dir, 'scripts/RNA/analysis')
+RNA.results.dir <- file.path(top.dir, 'results/RNA')
+analysis.results.dir <- file.path(RNA.results.dir, 'RNA_GSCs_clustering_DE')
+
+overwrite <- T
+if (overwrite) {
+  if (dir.exists(analysis.results.dir)) {
+    system(paste('rm -rf', analysis.results.dir))
+  }
+}
+
+for (dir.name in c(RNA.results.dir, analysis.results.dir)) {
+  if (!dir.exists(dir.name)) {
+    dir.create(dir.name)
+  }
+}
+setwd(scripts.dir)
+```
+
+```{r}
+data.dir <- file.path(top.dir, 'data/preprocessed/RNA/SU2C_coh1234_nonSU2C/')
+## Load data
+load(file = file.path(data.dir, 'RNA_adult_GBM_vst_combat_nonSU2C.RData'))
+load(file = file.path(data.dir, 'RNA_adult_GBM_dds.RData'))
+load(file = file.path(data.dir, 'RNA_adult_GBM_fpkm_combat_nonSU2C.RData'))
+dir(data.dir)
+
+## run checks
+stopifnot(all(rownames(RNA_adult_GBM_dds) == rownames(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(all(rownames(RNA_adult_GBM_fpkm_combat_nonSU2C) == rownames(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(all(colnames(RNA_adult_GBM_dds) == colnames(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(all(colnames(RNA_adult_GBM_fpkm_combat_nonSU2C) == colnames(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(identical(colData(RNA_adult_GBM_fpkm_combat_nonSU2C), colData(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(all(sapply(colnames(colData(RNA_adult_GBM_dds)), FUN = function(x) {
+  if (any(is.na(colData(RNA_adult_GBM_dds)[,x]))) {
+  # skiep NA entries in DESeq2 dataset object
+    y <- T
+  } else {
+    y <- all(colData(RNA_adult_GBM_dds)[,x] == colData(RNA_adult_GBM_vst_combat_nonSU2C)[,x])
+  }
+})))
+
+summ.expt <- SummarizedExperiment(assays = list(counts = counts(RNA_adult_GBM_dds),
+                                                vst = assay(RNA_adult_GBM_vst_combat_nonSU2C, 1),
+                                                log2.fpkm = log2(assay(RNA_adult_GBM_fpkm_combat_nonSU2C, 1))),
+                                  colData = colData(RNA_adult_GBM_vst_combat_nonSU2C))
+
+## subset for GSC lines
+summ.expt <- summ.expt[,which(summ.expt$Type_bis == 'L')]
+summ.expt
+
+## add nonSU2C status as batch variable
+
+RNA.GSC.obj <- SummExpDR::create_SummExpDR(summ.expt)
+
+```
+
+## Run PCA + clustering
+
+``` {r}
+
+# remove rows with no variance. If you don't do this, run_pca will throw and error from call to prcomp
+RNA.GSC.obj <- SummExpDR::detect_outliers(RNA.GSC.obj, assay_use = 'vst')
+
+RNA.GSC.obj <- SummExpDR::runPCA(RNA.GSC.obj, i = 'vst', std_norm = TRUE)
+
+SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'Cohort', shape_by = 'Lab')
+SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'is.outlier', shape_by = 'Lab')
+
+SummExpDR::screePlot(RNA.GSC.obj, key = 'PCA', dims_use = paste0('PC', 1:20))
+
+RNA.GSC.obj <- SummExpDR::run_multi_k_functions(x = RNA.GSC.obj, analysis_name = 'spectral', 
+                                               k_use = 2:4, num_iter = 200, thresh_ARI = 0.80,
+                                               thresh_proportion = 0.80, assay_use = 'vst',
+                                               algorithm = 'spectral_kernlab', std_norm = T,
+                                               sigma = 0.5, affi_K = 10)
+RNA.GSC.obj <- SummExpDR::get_soln_k(RNA.GSC.obj, add_2_metadata = T, k = 2, pick_best_valid = F)
+
+SummExpDR::plot_sim_dist(RNA.GSC.obj, save_file = F, mode = 'full.vs.rs', clust_analysis = 'spectral')
+SummExpDR::plot_sim_dist(RNA.GSC.obj, save_file = F, mode = 'resample.vs.perm', clust_analysis = 'spectral')
+
+SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'spectral_k2', shape_by = 'Lab')
+
+```
+
+
+We see that k = 2 is the best solution for the data (robust to resampling of data),
+so we'll perform differential expression + GSEA between the two things
+
+## Differential Expression + GSEA
+
+#### Run Differential Expression
+``` {r}
+
+# run differential expression
+RNA.GSC.obj <- SummExpDR::run_diff_exp(expt_data = RNA.GSC.obj, class_type_use = 'spectral_k2', covariates = c('is.nonSU2C'),
+                                        class1 = 1, class2 = 2, pipeline = 'DESEQ2', write_output = T,
+                                        output_dir = analysis.results.dir, prefix = 'RNA_GSCs_')
+analysis_name <- 'RNA_GSCs_spectral_k2_1_v_2'
+diff.exp.res <- getAnalyses(RNA.GSC.obj, key = analysis_name)$diff_exp
+is.upreg <- diff.exp.res$log2FoldChange > 0
+is.downreg <- diff.exp.res$log2FoldChange < 0
+passes.fdr <- diff.exp.res$padj < 0.05
+c1.upreg <- rownames(diff.exp.res[is.upreg & passes.fdr, ])
+c2.upreg <- rownames(diff.exp.res[is.downreg & passes.fdr, ])
+
+# geneset.dir <- file.path(top.dir, '/data/raw/GeneSets/owen_su2c_RNA_oct_2018/')
+# c1.markers.old <- read.csv(file.path(geneset.dir, 'RNA_SU2C_coh1234_nonSU2C_GSC_combat_nonSU2C_upreg_markers_k2_clust1.csv'),
+#                            stringsAsFactors = F)
+# c2.markers.old <- read.csv(file.path(geneset.dir, 'RNA_SU2C_coh1234_nonSU2C_GSC_combat_nonSU2C_upreg_markers_k2_clust2.csv'),
+#                            stringsAsFactors = F)
+# head(c1.markers.old)
+# head(c2.markers.old)
+# c1.markers.old <- c1.markers.old$x
+# c2.markers.old <- c2.markers.old$x
+# 
+# length(c1.upreg)
+# length(c1.markers.old)
+# length(intersect(c1.upreg, c1.markers.old))
+# 
+# length(c2.upreg)
+# length(c2.markers.old)
+# length(intersect(c2.upreg, c2.markers.old))
+
+# save 'marker genesets' in results directory
+write.csv(c1.upreg, file = file.path(analysis.results.dir, 'spectral_k2_c1_upreg_FDR_0_05.csv'), quote = F, row.names = F)
+write.csv(c2.upreg, file = file.path(analysis.results.dir, 'spectral_k2_c2_upreg_FDR_0_05.csv'), quote = F, row.names = F)
+
+```
+
+
+#### Run ssgsea using markersets
+``` {r}
+# Will have to add utility for adding metadata
+gset.list <- list(RNA.c1.upreg = c1.upreg,
+                  RNA.c2.upreg = c2.upreg)
+RNA.GSC.obj <- SummExpDR::run_gsva(RNA.GSC.obj, assay = 'log2.fpkm',
+                                  genesets = gset.list, method = 'ssgsea',
+                                  parallel.sz = 20, verbose = F)
+
+# save(RNA.GSC.ssgsea.result, file = file.path(analysis.results.dir, 'RNA_GSC_ssgsea_result.RData'))
+SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'RNA.c1.upreg', shape_by = 'spectral_k2')
+SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'RNA.c2.upreg', shape_by = 'spectral_k2')
+SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'RNA.c1.upreg', shape_by = 'Lab')
+SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'RNA.c2.upreg', shape_by = 'Lab')
+```
+
+#### Run GSEA
+``` {r}
+dir(analysis.results.dir)
+
+files <- dir(file.path(analysis.results.dir, 'RNA_GSCs_spectral_k2_1_v_2'))
+rankfile <- files[grep('.rnk', files)]
+gmt_file <- '../../../data/raw/gmt_files/baderlab_gmts/Human_GO_AllPathways_no_GO_iea_April_01_2018_symbol.gmt'
+SummExpDR::enrich_GSEA(gsea_rank_list_path = file.path(analysis.results.dir, 'RNA_GSCs_spectral_k2_1_v_2',
+                                            rankfile),
+                      gsea_analysis_name = 'RNA_GSCs_c1_v_c2',
+                      gsea_out = analysis.results.dir,
+                      gsea_gmx = gmt_file)
+
+```
+
+#### Examine results 
+
+``` {r}
+dir.contents <- dir(analysis.results.dir)
+GSEA.path <- file.path(analysis.results.dir, dir.contents[grep('GseaPreranked', dir.contents, ignore.case = T)])
+if (length(GSEA.path) != 1) {
+  stop(paste('expected 1 match for GSEA.path'))
+}
+
+GSEA.results <- retrieve_gsea(GSEA.path)
+```
+
+__Examine Enriched Pathways__
+``` {r}
+## Positively Enriched
+GSEA.results$na_pos_report
+## Negatively Enriched
+GSEA.results$na_neg_report
+```
+
+#### Save Results
+__Save Clustering + DiffExp Results to File__
+``` {r}
+save(RNA.GSC.obj, file = file.path(analysis.results.dir, 'RNA_GSC_obj.RData'))
+```
+
+## Session Info
+
+``` {r}
+Sys.time()
+sessionInfo()
+```

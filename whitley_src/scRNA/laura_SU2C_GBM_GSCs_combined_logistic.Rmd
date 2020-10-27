@@ -1,0 +1,330 @@
+---
+title: "Run Logistic Regression to Distinguish Btw Tumour + Line"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 5
+params:
+  inp_data: '/home/owenwhitley/projects/su2c_v2/data/preprocessed/scRNA/GSCs_Tumour_combined/laura_BTSC_Tumour_combined_Oct_2019_no_G800_L.rds'
+  results_dir: '/home/owenwhitley/projects/su2c_v2/results/scRNA/laura_SU2C_GSCs_GBM_combined_Oct_2019_no_G800_L_logistic'
+  rerun_logistic: TRUE
+  n_splits: 30
+  split_fraction: 0.20
+  base_seed: 32
+  coef_thresh: 0.10
+  file_prefix: 'logistic_regression_T_v_L'
+  heatmap_fontsize: 10.0
+  num_dims: 2
+  other_reductions_plot: 'pca'
+  dims_use_mapping: 'NULL'
+  reduction_use: 'pca'
+  feats_plot: 'NULL'
+---
+# Overview
+
+Here we are interested in seeing if tumour and line cells are linearly separable in PCA space and will
+be training a logistic regression classifier to see if this is the case. We will examine which PCs
+the classifier considers important, and see what genes are associated with said PCs.
+
+# Setup
+
+``` {r}
+suppressPackageStartupMessages({
+  library(ComplexHeatmap)
+  source('./laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+})
+for (i in 1:length(params)) {
+  param.i <- names(params)[i]
+  assign(param.i, params[[i]])
+  if (param.i == 'inp_data') {
+    if (is.character(inp_data)) {
+      # we only load data in from file for testing/debugging purposes.
+      # inp_data should generally be a Seurat object that is fully preprocessed 
+      # as outlined in 'seurat_pipeline' function in helper functions,
+      # with PCA calculated
+      if (file.exists(inp_data)) {
+        inp_data <- readRDS(inp_data)
+      } else {
+        stop('file does not exist')
+      }
+    }
+  }
+}
+# setup results directory if does not exist
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir)
+}
+
+other_reductions_plot <- setdiff(other_reductions_plot, reduction_use)
+
+# not current run options
+run_opts_curr <- params[c('n_splits', 'split_fraction', 'base_seed', 'file_prefix')]
+results_file <- paste0(file_prefix, '.pydata')
+run_opts_file <- paste0(file_prefix, '_run_opts.rds')
+
+# setup mapping of dim reduction names to dims to use for each dim reduction in 'other_reductions
+if (dims_use_mapping == 'NULL') {
+  # dims_use_mapping should be a named list of lists, with each 'sublist' containing pairs of 
+  # dimensions to plot
+  dims_use_mapping <- list(pca = list(c(1,2), c(1,3)),
+                           tsne = list(c(1,2)))
+} else {
+  if (!is.list(dims_use_mapping)) {
+    stop('dims_use_mapping, if specified, must be a list')
+  }
+}
+if (!all(other_reductions_plot %in% names(dims_use_mapping))) {
+  stop('all reductions plotted must be in names of dim_use_mapping')
+}
+# decide whether or not we will be plotting feature loadings for pca. may change in future to accomodate mnn/fastmnn loadings
+use_pca <- 'pca' == reduction_use
+
+# specify features to plot if left unspecified
+if (feats_plot == 'NULL') {
+  feats_plot <- c('SampleType', 'pred_class', 'misclassified', 'SampleID')
+}
+
+```
+
+# Computations
+
+```{r}
+
+if (!file.exists(file.path(results_dir, results_file)) || rerun_logistic) {
+  # see if there are any PCs that can separate tumour + line
+  T_v_L_logistic <- fit_logistic_multi(X = GetCellEmbeddings(inp_data, 
+                                                             reduction.type = reduction_use)[,1:num_dims],
+                                       y = as.character(inp_data@meta.data$SampleType),
+                                       num_splits = n_splits, 
+                                       split_fraction = split_fraction, 
+                                       base_seed = base_seed,
+                                       penalty = 'l2')
+  # save run options
+  run_opts_prev <- run_opts_curr
+  reticulate::py_save_object(T_v_L_logistic, file = file.path(results_dir, results_file))
+  saveRDS(run_opts_prev, file = file.path(results_dir, run_opts_file))
+} else {
+  T_v_L_logistic <- reticulate::py_load_object(file.path(results_dir, results_file))
+  run_opts_prev <- readRDS(file.path(results_dir, run_opts_file))
+  if (!identical(run_opts_prev, run_opts_curr)) {
+    warning(run_opts_prev)
+    stop('previous run options not identical to current run options. \
+         reset run options to previous values or set rerun_logistic to TRUE')
+  }
+}
+
+gc(full = TRUE)
+  
+```
+
+# View Results
+
+## Train  + Test Accuracy, Model Coefficients
+
+``` {r, fig.width = 5, fig.height = 7}
+
+# plot train + test Accuracy
+train_test_accuracy <- data.frame(Data = factor(c(rep('Train', n_splits), rep('Test', n_splits)), levels = c('Train', 'Test')),
+                                  Accuracy = c(T_v_L_logistic$train_accuracy_vals,
+                                               T_v_L_logistic$test_accuracy_vals))
+
+p <- ggplot(data = train_test_accuracy, mapping = aes(Data, Accuracy)) + geom_boxplot()
+p <- p + 
+  ggtitle('Train + Test Accuracy\n30 splits') + 
+  theme(text = element_text(size = 20), plot.title = element_text(hjust = 0.5)) +
+  theme_cowplot()
+print(p)
+
+# plot model coefficients
+split_coefs <- lapply(1:ncol(T_v_L_logistic$coefs_mat), 
+                      FUN = function(x)return(T_v_L_logistic$coefs_mat[,x]))
+coefs_df <- data.frame(dimension = numeric(0), coef = numeric(0))
+for (i in 1: length(split_coefs)) {
+  new_df <- data.frame(dimension = rep(i, length(split_coefs[[i]])),
+                       coef = split_coefs[[i]])
+  coefs_df <- rbind(coefs_df, new_df)
+  rm(new_df)
+}
+coefs_df$dimension <- factor(coefs_df$dimension)
+xlab_model_coef <- paste(toupper(reduction_use), 'Dimension')
+p <- ggplot(data = coefs_df, mapping = aes(dimension, coef)) + geom_boxplot()
+p <- p + 
+  ggtitle('Model Coefficients\n30 splits') + 
+  theme(text = element_text(size = 20), plot.title = element_text(hjust = 0.5)) +
+  xlab(xlab_model_coef) + ylab('Coefficient') + 
+  theme_cowplot()
+print(p)
+
+model_coefs <- T_v_L_logistic$final_model$model$coef_
+model_coefs
+```
+
+## Look at Model Coefficients
+
+``` {r}
+# filter PCs by having model coefficients > thresh
+interesting_dims <- which(abs(model_coefs) > coef_thresh)
+```
+
+``` {r, fig.height = 12, fig.width = 6, dev = 'svg', eval=use_pca}
+
+
+gene_loadings <- Seurat::GetDimReduction(inp_data, 
+                                         reduction.type = 'pca', 
+                                         slot = 'gene.loadings')
+head(gene_loadings)
+# only look at gene loadings for genes in top 20 for at least 1 PC in PCs of interest
+if (length(interesting_dims) >= 1) {
+  gene_loadings <- gene_loadings[,interesting_dims]
+  return_top_20 <- function(x) {
+    x[order(abs(x), decreasing = TRUE)][1:20]
+  }
+  
+  if (class(gene_loadings) == 'matrix') {
+    in_top_genes <- apply(gene_loadings, MARGIN = 2, FUN = function(x) {
+    names(x) <- rownames(gene_loadings)
+    return(names(x) %in% names(return_top_20(x)))
+    })
+    genes_keep <- apply(in_top_genes, FUN = function(x) {any(x)}, MARGIN = 1)
+    gene_loadings <- gene_loadings[genes_keep,]
+  } else if (is.vector(gene_loadings)) {
+    in_top_genes <- names(gene_loadings) %in% names(return_top_20(gene_loadings))
+    gene_loadings <- gene_loadings[in_top_genes]
+    gene_loadings <- matrix(gene_loadings, ncol = 1, 
+                            dimnames = list(rownames = names(gene_loadings), colnames = interesting_dims[1]))
+  }
+  
+  Heatmap(gene_loadings, row_names_gp = gpar(fontsize = heatmap_fontsize), name = 'PC loading',
+          cluster_columns = FALSE)
+  
+  # PCHeatmap(inp_data, pc.use = interesting_dims)
+
+} else {
+  print('No PCs observed with coefficients above threshold')
+}
+
+```
+
+## Visualize Where Predicted Classes Occur on Dim Red Plots
+
+### Make Predictions and Label Misclassified Cells
+
+``` {r}
+cell_embeddings <- Seurat::GetCellEmbeddings(inp_data, reduction = reduction_use)[,1:num_dims]
+pred_class <- T_v_L_logistic$final_model$model$predict(cell_embeddings)
+inp_data@meta.data$pred_class <- pred_class
+inp_data@meta.data$misclassified <- inp_data@meta.data$pred_class != inp_data@meta.data$SampleType
+saveRDS(inp_data, file = file.path(results_dir, paste0(file_prefix, '_seurat.rds')))
+```
+
+### Imput Embedding Space Plots
+
+``` {r}
+try({
+  if (length(interesting_dims) > 1) {
+    for (i in 1:(length(interesting_dims) - 1)) {
+      for (j in (i+1):length(interesting_dims)) {
+        make_dr_plots(inp_data, dim1 = interesting_dims[i], dim2 = interesting_dims[j],
+                      feats_plot = feats_plot, reduction.use = reduction_use, legend_pt_size = 5)
+        cat('**Misclassified Cells Only**\n')
+        make_dr_plots(inp_data, dim1 = interesting_dims[i], dim2 = interesting_dims[j],
+                      feats_plot = feats_plot, reduction.use = reduction_use,
+                      filter_by = 'misclassified', filter_class = 'TRUE',
+                      legend_pt_size = 5)
+      }
+    }
+  } else {
+    make_dr_plots(inp_data, dim1 = 1, dim2 = 2,
+                  feats_plot = feats_plot, reduction.use = reduction_use,
+                  legend_pt_size = 5)
+    cat('**Misclassified Cells Only**\n')
+    make_dr_plots(inp_data, dim1 = 1, dim2 = 2,
+                  feats_plot = feats_plot, reduction.use = reduction_use,
+                  filter_by = 'misclassified', filter_class = 'TRUE',
+                  legend_pt_size = 5)
+  }
+})
+
+
+
+```
+
+### other reductions to use
+
+``` {r, results='asis'}
+for (dr_name in other_reductions_plot) {
+  dr_name_upper <- toupper(dr_name)
+  cat(paste('####', dr_name_upper, '\n'))
+  dims_use_list <- dims_use_mapping[[dr_name]]
+  
+  for (i in 1:length(dims_use_list)) {
+    dims_i <- dims_use_list[[i]]
+    cat(paste('#####', paste(dr_name_upper, dims_i[1]), paste(dr_name_upper, dims_i[2]), '\n'))
+    try({
+      make_dr_plots(inp_data, dim1 = dims_i[1], dim2 = dims_i[2], 
+                      feats_plot = feats_plot, reduction.use = dr_name, legend_pt_size = 5)
+      cat('**Misclassified Cells Only**\n')
+      make_dr_plots(inp_data, dim1 = dims_i[1], dim2 = dims_i[2], 
+                        feats_plot = feats_plot, reduction.use = dr_name,
+                    filter_by = 'misclassified', filter_class = 'TRUE', legend_pt_size = 5)
+    })
+    cat('\n')
+    cat('\n')
+  }
+}
+
+```
+
+
+## Assess Proportions of Tumour + Line Cells in Misclassified Cells
+
+``` {r, error=TRUE}
+
+stacked_barcharts(inp_data = inp_data@meta.data, split_by = 'misclassified', color_by = 'SampleType')
+stacked_barcharts(inp_data = inp_data@meta.data, split_by = 'misclassified', color_by = 'SampleType', show_proportion = TRUE)
+stacked_barcharts(inp_data = inp_data@meta.data, split_by = 'SampleType', color_by = 'misclassified')
+stacked_barcharts(inp_data = inp_data@meta.data, split_by = 'SampleType', color_by = 'misclassified', show_proportion = TRUE)
+
+# make table displaying misclassified cells by SampleType (Tumour or Line)
+sampletype_vs_misclassified <- make_table(inp_data@meta.data, var1 = 'SampleType', var2 = 'misclassified')
+sampletype_vs_misclassified
+write.csv(sampletype_vs_misclassified, file = file.path(results_dir, paste0(file_prefix, '_sampletype_vs_misclassified.csv')))
+
+# show misclassified cells by Sample ID
+# tumours
+p <- stacked_barcharts(inp_data = inp_data@meta.data[inp_data@meta.data$SampleType == 'Tumour',], 
+                       split_by = 'SampleID', color_by = 'misclassified', show_proportion = FALSE)
+p <- p + theme(axis.text.x = element_text(angle = 90, size = heatmap_fontsize))
+print(p)
+p <- stacked_barcharts(inp_data = inp_data@meta.data[inp_data@meta.data$SampleType == 'Tumour',], 
+                       split_by = 'SampleID', color_by = 'misclassified', show_proportion = TRUE)
+p <- p + theme(axis.text.x = element_text(angle = 90, size = heatmap_fontsize))
+print(p)
+
+# lines
+p <- stacked_barcharts(inp_data = inp_data@meta.data[inp_data@meta.data$SampleType == 'Line',], 
+                       split_by = 'SampleID', color_by = 'misclassified', show_proportion = FALSE)
+p <- p + theme(axis.text.x = element_text(angle = 90, size = heatmap_fontsize))
+print(p)
+p <- stacked_barcharts(inp_data = inp_data@meta.data[inp_data@meta.data$SampleType == 'Line',], 
+                       split_by = 'SampleID', color_by = 'misclassified', show_proportion = TRUE)
+p <- p + theme(axis.text.x = element_text(angle = 90, size = heatmap_fontsize))
+print(p)
+# make tables showing same info
+SampleID_vs_misclassified <- make_table(inp_data@meta.data, var1 = 'SampleID', var2 = 'misclassified', filter_by = NULL, filter_class = NULL)
+# order by tumour/line status
+SampleID_vs_misclassified <- SampleID_vs_misclassified[order(grepl('_T', rownames(SampleID_vs_misclassified))),]
+SampleID_vs_misclassified
+write.csv(SampleID_vs_misclassified, file = file.path(results_dir, paste0(file_prefix, '_SampleID_vs_misclassified.csv')))
+write.csv(SampleID_vs_misclassified, file = file.path(results_dir, paste0(file_prefix, '_SampleID_vs_misclassified.csv')))
+
+```
+
+# SessionInfo
+
+``` {r}
+Sys.time()
+sessionInfo()
+```
+

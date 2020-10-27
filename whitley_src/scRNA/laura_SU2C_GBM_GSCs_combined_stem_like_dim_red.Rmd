@@ -1,0 +1,131 @@
+---
+title: "Dimensionality reduction for stem like cells"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+params:
+  inp_data: '/home/owenwhitley/projects/su2c_v2/results/scRNA/GSCs_Tumour_combined_no_G800_L_G637_L/BTSC_Tumour_combined_stem_like.rds'
+  genes_for_pca: 'NULL'
+  results_dir: '/home/owenwhitley/projects/su2c_v2/results/scRNA/GSCs_Tumour_combined_no_G800_L_G637_L/'
+  results_file: 'BTSC_Tumour_stem_like_w_dim_red.rds'
+---
+
+# Overview
+
+Run dimensionality reducton of stem like cells and assess if/how stem like 
+
+# Setup + load in data
+
+``` {r}
+
+source('laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+
+for (i in 1:length(params)) {
+  param.i <- names(params)[i]
+  assign(param.i, params[[i]])
+}
+
+
+if (is.character(inp_data)) {
+      # we only load data in from file for testing/debugging purposes.
+      # inp_data should generally be a Seurat object that is fully preprocessed 
+      # as outlined in 'seurat_pipeline' function in helper functions,
+      # with PCA calculated
+      if (file.exists(inp_data)) {
+        inp_data <- readRDS(inp_data)
+      } else {
+        stop('File for input data does not exist')
+      }
+}
+if (is.character(genes_for_pca)) {
+  if (genes_for_pca == 'NULL') {
+    genes_for_pca <- NULL
+  }
+} else if (!is.null(genes_for_pca)) {
+  stop('genes_for_pca must be character or NULL')
+}
+
+
+stopifnot(is(inp_data, 'seurat'))
+
+```
+
+``` {r}
+# rescale data
+inp_data <- Seurat::FindVariableGenes(inp_data)
+inp_data <- regress_data(inp_data,
+                        vars_regress = c('nUMI', 'percent.mito', 'CC.Difference'),
+                        genes_use = genes_for_pca)
+inp_data <- Seurat::RunPCA(inp_data, do.print = FALSE, pc.genes = genes_for_pca)
+# automatically determine perplexity parameter if throws error on first time around
+perplexity_param <- 30
+continue <- TRUE
+while(continue) {
+   do_increment <- TRUE
+   try ({
+     print(paste('Trying perplexity =', perplexity_param))
+     inp_data <- Seurat::RunTSNE(inp_data, perplexity = perplexity_param, reduction.use = 'pca')
+     do_increment <- FALSE
+   })
+   if (do_increment) {
+     perplexity_param <- perplexity_param - 1
+   } else {
+     continue <- FALSE
+     print(paste('Success'))
+   }
+   if (perplexity_param < 1) {
+     stop('no perplexity param searched ran TSNE without error')
+   }
+}
+# inp_data <- RunDiffusion(inp_data)
+
+Seurat::PCElbowPlot(inp_data)
+orig_clusts <- inp_data@meta.data$seurat_clusters
+inp_data <- FindClusters(inp_data, reduction.type = 'pca', dims.use = 1:10, resolution = 0.8)
+inp_data@meta.data$seurat_clusters <- inp_data@meta.data$res.0.8
+all(as.integer(inp_data@meta.data$seurat_clusters) == as.integer(orig_clusts))
+```
+
+```{r}
+### PCA plots
+
+# pca was run on mixed cluster cells after standard seurat pipeline rerun.
+# clustering was rerun on these cells using seurat's modularity based method
+for (i in 1:9) {
+  make_dr_plots(inp_data, i, i + 1, reduction.use = 'pca',
+                feats_plot = c('culture_cond', 'seurat_clusters'), legend_pt_size = 1.0,
+                legend_pt_shape = 15)
+}
+
+# make_dr_plots(inp_data, 1, 3, reduction.use = 'pca', num_feats = character(0),
+#               cat_feats = c('culture_cond', 'seurat_clusters'))
+
+make_dr_plots(inp_data, 1, 2, reduction.use = 'tsne',
+              feats_plot = c('SampleType', 'seurat_clusters'),
+              legend_pt_size = 1.0, legend_pt_shape = 15)
+
+```
+
+### composition of clusters
+
+``` {r}
+stacked_barcharts(inp_data = inp_data@meta.data, split_by = 'seurat_clusters', color_by = 'SampleType')
+```
+
+### Save Results
+
+``` {r}
+gc(full = TRUE)
+if (!dir.exists(results_dir)) {
+  dir.create(results_dir)
+}
+saveRDS(inp_data, file = file.path(results_dir, results_file))
+```
+
+### Session Info
+
+``` {r}
+Sys.time()
+sessionInfo()
+```

@@ -1,0 +1,2 @@
+Rscript laura_diffusion_map_plots.R > laura_diffusion_map_plots_out.txt 2>laura_diffusion_map_plots_stderr.txt
+Rscript laura_Diffusion_Map_GSCs.R > laura_Diffusion_Map_GSCs_out.txt 2>laura_Diffusion_Map_GSCs_stderr.txt

@@ -1,0 +1,200 @@
+---
+title: "Assess Correlation of Matched Tumours + Lines"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+# Code and Plots
+
+```{r}
+library(SummarizedExperiment)
+library(corrplot)
+library(ComplexHeatmap)
+library(circlize)
+library(ggplot2)
+library(GSVA)
+library(reticulate)
+
+top.dir <- '/home/owenwhitley/projects/su2c_v2/'
+data.dir <- file.path(top.dir, 'data/preprocessed/RNA/SU2C_coh1234_nonSU2C/')
+## Load data
+load(file = file.path(data.dir, 'RNA_adult_GBM_vst_combat_nonSU2C.RData'))
+```
+
+## fit linear model
+
+``` {r}
+
+# try correcting for RNA GSC c1 and RNA GSC c2 scores via OLS
+preproc.dir <- file.path(top.dir, '/data/preprocessed/')
+gset.dir <- file.path(preproc.dir, 'GeneSets/')
+gsets.file <- 'genesets_and_info_RNA_filt.rds'
+genesets.and.info <- readRDS(file.path(gset.dir, gsets.file))
+
+ssgsea_mat <- GSVA::gsva(assay(RNA_adult_GBM_vst_combat_nonSU2C, 1), 
+                         gset.idx.list = genesets.and.info$gene_set_list[c('RNA.GSC.c1', 'RNA.GSC.c2')],
+                         method = 'ssgsea')
+ssgsea_mat <- ssgsea_mat[,colnames(RNA_adult_GBM_vst_combat_nonSU2C)]
+LM <- reticulate::import(module = 'sklearn.linear_model')
+LM_obj <- LM$LinearRegression()
+LM_obj$fit(X = t(ssgsea_mat), y = t(assay(RNA_adult_GBM_vst_combat_nonSU2C, 1)))
+pred_vals <- LM_obj$predict(t(ssgsea_mat))
+true_vals <- t(assay(RNA_adult_GBM_vst_combat_nonSU2C, 1))
+LM_residuals <- true_vals - pred_vals
+
+# mean_mat <- apply(true_vals, MARGIN = 2, FUN = function(x) {return(rep(mean(x), nrow(true_vals)))})
+# r_sq <- 1 - sum(as.numeric(LM_residuals)^2)/sum(as.numeric(true_vals - mean_mat)^2)
+
+hist(LM_residuals)
+hist(pred_vals)
+hist(true_vals)
+
+# assess r^2
+LM_obj$score(X = t(ssgsea_mat), y = true_vals)
+
+# set to residuals
+assay(RNA_adult_GBM_vst_combat_nonSU2C, 1) <- t(LM_residuals)
+
+```
+
+## subset data for matched tumours + lines
+
+``` {r}
+
+# get patient ids, run checks
+tumour_patient_ids <- RNA_adult_GBM_vst_combat_nonSU2C$Patient[RNA_adult_GBM_vst_combat_nonSU2C$Type_bis == 'T']
+line_patient_ids <- RNA_adult_GBM_vst_combat_nonSU2C$Patient[RNA_adult_GBM_vst_combat_nonSU2C$Type_bis == 'L']
+
+any(duplicated(tumour_patient_ids))
+
+match_patients <- intersect(tumour_patient_ids, line_patient_ids)
+length(match_patients)
+any(duplicated(match_patients))
+
+# subset for only samples with matched tumour + line
+vst_subs <- RNA_adult_GBM_vst_combat_nonSU2C[,RNA_adult_GBM_vst_combat_nonSU2C$Patient %in% match_patients]
+colnames(vst_subs) <- vst_subs$SampleID_used
+
+match_tumour_names <- vst_subs$SampleID_used[vst_subs$Type_bis == 'T']
+match_line_names <- vst_subs$SampleID_used[vst_subs$Type_bis == 'L']
+```
+
+## All pairwise correlation values
+
+``` {r}
+## show full correlation matrix
+vst_mat <- assay(vst_subs, 1)
+# color_fun <- colorRamp2(breaks = c(0.75, 0.9, 1.0), colors = c('darkblue', 'white', 'red'))
+cor_mat_full <- cor(vst_mat, method = 'spearman')
+Heatmap(cor_mat_full, 
+        row_names_gp = gpar(fontsize = 2.5), 
+        column_names_gp = gpar(fontsize = 2.5),
+        name = 'spearman correlation')
+```
+
+## tissue x line pairwise values
+
+``` {r}
+## show correlation matrix comparing matched tissues + lines
+cor_mat_T_v_L <- cor(vst_mat[,match_tumour_names], vst_mat[,match_line_names], method = 'spearman')
+dim(cor_mat_T_v_L)
+
+Heatmap(cor_mat_T_v_L, 
+        row_names_gp = gpar(fontsize = 5), 
+        column_names_gp = gpar(fontsize = 5),
+        name = 'spearman correlation')
+## divide into matched and unmatched pairwise correlation values
+rownames(cor_mat_T_v_L) <- sub('_T', '', rownames(cor_mat_T_v_L))
+colnames(cor_mat_T_v_L) <- sub('_L', '', colnames(cor_mat_T_v_L))
+
+```
+
+
+``` {r}
+# check that same set of patient names created by subbing out sample type suffixes
+length(intersect(rownames(cor_mat_T_v_L), colnames(cor_mat_T_v_L))) == nrow(cor_mat_T_v_L)
+length(intersect(rownames(cor_mat_T_v_L), colnames(cor_mat_T_v_L))) == ncol(cor_mat_T_v_L)
+patient_ids <- rownames(cor_mat_T_v_L)
+patient_ids <- patient_ids[order(patient_ids)]
+
+cor_mat_T_v_L <- cor_mat_T_v_L[patient_ids, patient_ids]
+
+Heatmap(cor_mat_T_v_L, row_title = 'Tissue', column_title = 'Line',
+        row_names_gp = gpar(fontsize = 5),
+        column_names_gp = gpar(fontsize = 5),
+        name = 'spearman correlation',
+        cluster_rows = FALSE,
+        cluster_columns = FALSE)
+```
+
+Here cell lines and tumours are ordered by name, not clustered, so that we get matched tissue + line on diagonal
+
+## Boxplot of pairwise correlations
+
+``` {r}
+# get pairwise correlations between matching samples
+match_cor_vals <- diag(cor_mat_T_v_L)
+# get nonmatching
+nonmatch_cor_vals <- c()
+for (i in 1:(nrow(cor_mat_T_v_L) - 1)) {
+  for (j in (i+1):ncol(cor_mat_T_v_L)) {
+    nonmatch_cor_vals <- c(nonmatch_cor_vals, cor_mat_T_v_L[i,j])
+  }
+}
+
+# tissue x tissue
+tissue_vals <- c()
+cor_mat_tissue <- cor_mat_full[match_tumour_names, match_tumour_names]
+for (i in 1:(nrow(cor_mat_tissue) - 1)) {
+  for (j in (i+1):ncol(cor_mat_tissue)) {
+    tissue_vals <- c(tissue_vals, cor_mat_tissue[i,j])
+  }
+}
+
+# line x line
+line_vals <- c()
+cor_mat_line <- cor_mat_full[match_line_names, match_line_names]
+for (i in 1:(nrow(cor_mat_line) - 1)) {
+  for (j in (i+1):ncol(cor_mat_line)) {
+    line_vals <- c(line_vals, cor_mat_line[i,j])
+  }
+}
+# boxplot
+values_list <- list(matching_pairs = match_cor_vals, 
+                     nonmatching = nonmatch_cor_vals, 
+                     matching_adherent = match_cor_vals[grep('^G', names(match_cor_vals))],
+                     matching_sphere = match_cor_vals[grep('^BT', names(match_cor_vals))],
+                    tissue_by_tissue = tissue_vals,
+                    line_by_line = line_vals
+                    )
+df <- c()
+for (i in 1:length(values_list)) {
+  next_rows <- data.frame(value = values_list[[i]],
+                          type = rep(names(values_list)[i], 
+                                     length(values_list[[i]])))
+  df <- rbind(df,
+              next_rows)
+}
+colnames(df) <- c('value', 'type')
+
+p <- ggplot(data = df, mapping = aes(x = type, y = value)) + geom_boxplot() + 
+  ylab('spearman correlation') + xlab('pairwise correlation type') + theme_grey() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+print(p)
+```
+
+matching_pairs = pairwise correlation values for matching tissue + line  
+nonmatching = pairwise correlation values for non-matching tissue + line  
+matching_adherent = subset of matching_pairs corresponding to adherent cell lines only  
+matching_sphere = subset of matching_pairs corresponding to sphere lines only  
+tissue_by_tissue = all non-matching pairs for tissue x tissue correlation values  
+line_by_line = all non-matching pairs for line x line correlation values
+
+# SessionInfo
+
+``` {r}
+Sys.time()
+sessionInfo()
+```

@@ -1,0 +1,154 @@
+---
+title: "Clustering and Differential Expression, RNA-seq, SU2C adult GBM lines, no Cohort 4"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+## Setup Directories + Load Data
+
+```{r, results='hide'}
+## get required packages
+library(su2cproj)
+library(DESeq2)
+library(SummarizedExperiment)
+library(sva)
+## Setup directories
+top.dir <- '/home/owenwhitley/projects/su2c_v2/'
+scripts.dir <- file.path(top.dir, 'scripts/RNA/analysis')
+RNA.results.dir <- file.path(top.dir, 'results/RNA')
+analysis.results.dir <- file.path(RNA.results.dir, 'RNA_GSCs_clustering_DE_coh123_nonSU2C_Mar_2019')
+
+overwrite <- T
+if (overwrite) {
+  if (dir.exists(analysis.results.dir)) {
+    system(paste('rm -rf', analysis.results.dir))
+  }
+}
+
+for (dir.name in c(RNA.results.dir, analysis.results.dir)) {
+  if (!dir.exists(dir.name)) {
+    dir.create(dir.name)
+  }
+}
+setwd(scripts.dir)
+```
+
+```{r}
+data.dir <- file.path(top.dir, 'data/preprocessed/RNA/SU2C_coh1234_nonSU2C/')
+## Load data
+load(file = file.path(data.dir, 'RNA_adult_GBM_vst.RData'))
+load(file = file.path(data.dir, 'RNA_adult_GBM_dds.RData'))
+load(file = file.path(data.dir, 'RNA_adult_GBM_fpkm.RData'))
+dir(data.dir)
+
+## run checks
+stopifnot(all(rownames(RNA_adult_GBM_dds) == rownames(RNA_adult_GBM_vst)))
+stopifnot(all(rownames(RNA_adult_GBM_fpkm) == rownames(RNA_adult_GBM_vst)))
+stopifnot(all(colnames(RNA_adult_GBM_dds) == colnames(RNA_adult_GBM_vst)))
+stopifnot(all(colnames(RNA_adult_GBM_fpkm) == colnames(RNA_adult_GBM_vst)))
+stopifnot(identical(colData(RNA_adult_GBM_fpkm), colData(RNA_adult_GBM_vst)))
+stopifnot(all(sapply(colnames(colData(RNA_adult_GBM_dds)), FUN = function(x) {
+  if (any(is.na(colData(RNA_adult_GBM_dds)[,x]))) {
+  # skiep NA entries in DESeq2 dataset object
+    y <- T
+  } else {
+    y <- all(colData(RNA_adult_GBM_dds)[,x] == colData(RNA_adult_GBM_vst)[,x])
+  }
+})))
+
+summ.expt <- SummarizedExperiment(assays = list(counts = counts(RNA_adult_GBM_dds),
+                                                vst = assay(RNA_adult_GBM_vst, 1),
+                                                log2.fpkm = log2(assay(RNA_adult_GBM_fpkm, 1))),
+                                  colData = colData(RNA_adult_GBM_vst))
+dim(summ.expt)
+summ.expt <- summ.expt[,-which(summ.expt$Cohort == 'Cohort4')]
+dim(summ.expt)
+```
+
+## PCA on non-batch corrected data
+
+``` {r}
+no.batch <- create_su2c_obj(summ.expt, 'non batch corrected data', '')
+no.batch <- run_pca(no.batch, scale. = T, center = T, assay.id = 'vst')
+pca_plot_multi_feature(no.batch, features1 = c('Cohort'), features2 = c('Lab'), PCs1 = 1:5, print.plots = T, save.plots = F, return.plots = F)
+
+samples.keep <- summ.expt$Type_bis == 'L' & summ.expt$Cohort %in% paste0('Cohort', 1:3)
+genes.remove <- which(apply(assay(summ.expt[,samples.keep], 'vst'), MARGIN = 1, var) == 0)
+no.batch <- create_su2c_obj(summ.expt[-genes.remove,samples.keep], 'non batch corrected data', '')
+no.batch <- run_pca(no.batch, scale. = T, center = T, assay.id = 'vst')
+pca_plot_multi_feature(no.batch, features1 = c('Cohort'), features2 = c('Lab'), PCs1 = 1:5, print.plots = T, save.plots = F, return.plots = F)
+
+# we want to correcto for cohort
+
+```
+
+## PCA on batch corrected data
+
+``` {r}
+covariate_formula <- formula('~ Type_bis + Lab + Sex + Age + Primary_recurrent')
+mod_frame <- model.frame(data = colData(summ.expt), 
+                         formula = covariate_formula)
+mod_mat <- model.matrix(object = covariate_formula, data = mod_frame)
+for (assay.id in c('vst', 'log2.fpkm')) {
+  assay(summ.expt, assay.id) <- ComBat(dat = assay(summ.expt, assay.id), batch = summ.expt$Cohort, mod = mod_mat)
+}
+
+batch.corrected <- create_su2c_obj(summ.expt, 'non batch corrected data', '')
+batch.corrected <- run_pca(batch.corrected, scale. = T, center = T, assay.id = 'vst')
+pca_plot_multi_feature(batch.corrected, features1 = c('Cohort'), features2 = c('Lab'), PCs1 = 1:5, print.plots = T, save.plots = F, return.plots = F)
+
+samples.keep <- summ.expt$Type_bis == 'L' # & summ.expt$Cohort %in% paste0('Cohort', 1:3)
+batch.corrected <- create_su2c_obj(summ.expt[,samples.keep], 'non batch corrected data', '')
+batch.corrected <- run_pca(batch.corrected, scale. = T, center = T, assay.id = 'vst')
+pca_plot_multi_feature(batch.corrected, features1 = c('Cohort'), features2 = c('Lab'), PCs1 = 1:5, print.plots = T, save.plots = F, return.plots = F)
+
+```
+
+
+## Run clustering on Dirks Lines only
+```{r}
+samples.keep <- summ.expt$Type_bis == 'L'  & summ.expt$Lab == 'Dirks'
+batch.corrected <- create_su2c_obj(summ.expt[,samples.keep], 'non batch corrected data', '')
+batch.corrected <- run_pca(batch.corrected, scale. = T, center = T, assay.id = 'vst')
+pca_plot_multi_feature(batch.corrected, features1 = c('Cohort'), features2 = c('Lab'), PCs1 = 1:5, print.plots = T, save.plots = F, return.plots = F)
+scree_plot(batch.corrected, num.pcs = 10, save = F)
+
+batch.corrected <- run_multi_k_functions(x = batch.corrected, assay.use = 'vst', analysis.name = 'spectral',
+                                         use.pca = T, pcs.use = 1:3, k.use = 2:5, num_iter = 100)
+
+plot_sim_dist(batch.corrected)
+for (k in 2:5) {
+  batch.corrected <- get_soln_k(batch.corrected, pick.best.valid = F, k = as.numeric(k), add.2.metadata = T)
+}
+
+pca_plot_multi_feature(batch.corrected, features1 = paste0('spectral_k',2:5), features2 = c('Cohort'), PCs1 = 1:3, print.plots = T, save.plots = F, return.plots = F)
+
+```
+
+## Repeat for All samples
+
+``` {r}
+samples.keep <- summ.expt$Type_bis == 'L'  & summ.expt$Type_bis == 'L'
+batch.corrected <- create_su2c_obj(summ.expt[,samples.keep], 'non batch corrected data', '')
+batch.corrected <- run_pca(batch.corrected, scale. = T, center = T, assay.id = 'vst')
+pca_plot_multi_feature(batch.corrected, features1 = c('Cohort'), features2 = c('Lab'), PCs1 = 1:5, print.plots = T, save.plots = F, return.plots = F)
+scree_plot(batch.corrected, num.pcs = 10, save = F)
+
+batch.corrected <- run_multi_k_functions(x = batch.corrected, assay.use = 'vst', analysis.name = 'spectral',
+                                         use.pca = T, pcs.use = 1:5, k.use = 2:5, num_iter = 100)
+
+plot_sim_dist(batch.corrected)
+for (k in 2:5) {
+  batch.corrected <- get_soln_k(batch.corrected, pick.best.valid = F, k = as.numeric(k), add.2.metadata = T)
+}
+
+pca_plot_multi_feature(batch.corrected, features1 = paste0('spectral_k',2:5), features2 = c('Cohort'), PCs1 = 1:3, print.plots = T, save.plots = F, return.plots = F)
+```
+## Session Info
+
+``` {r}
+Sys.time()
+sessionInfo()
+```

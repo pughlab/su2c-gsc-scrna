@@ -1,0 +1,75 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+
+```{r}
+
+library(Seurat)
+library(SummarizedExperiment)
+library(SummExpDR)
+
+top.dir <- '~/projects/su2c_v2'
+master_output_dir <- file.path(top.dir, '/results/scRNA')
+overwrite.output <- TRUE
+output_dir <- file.path(master_output_dir, 'laura_GBM_Nov_2019_GSEA')
+output_dir <- paste0(output_dir, '_', gsub('(-| |:)', '_', Sys.time()))
+if (overwrite.output) {
+  system(paste('rm -rf', output_dir))
+}
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+## load scRNA data
+data_dir <- '../../data/raw/scRNA/Data/SU2C_GBM_Tumours_Nov_2019'
+data_file <- 'SU2C_TumourCellsOnly_Seurat_AUC_Nov2019.RData'
+load(file.path(data_dir, data_file))
+```
+
+## Run GSEA on association with Injury Response/Developmental program
+
+``` {r}
+
+# calculate 'Injury Response'/'Development' score diff
+norm_x <- function(x) {
+  return((x - min(x))/(max(x) - min(x)))
+}
+inj_resp_norm <- norm_x(TumourCells@meta.data$RNA.GSC.c2_AUC)
+dev_norm <- norm_x(TumourCells@meta.data$RNA.GSC.c1_AUC)
+TumourCells@meta.data$Dev_IR_Score_Diff <- dev_norm - inj_resp_norm
+# calculate correlation with genes, removing any NA values
+gene_cor <- cor(t(TumourCells@scale.data), TumourCells@meta.data$Dev_IR_Score_Diff)
+na_inds <- which(is.na(gene_cor[,1]))
+na_genes <- rownames(gene_cor)[na_inds]
+write.csv(na_genes, file = file.path(output_dir, 'na_cor_genes.csv'))
+na_genes
+
+gene_cor <- as.data.frame(gene_cor[-na_inds, ])
+
+# setup rank file
+gene_cor_Dev_IR <- data.frame(genes = rownames(gene_cor), correlation = gene_cor[,1])
+gene_cor_Dev_IR <- gene_cor_Dev_IR[order(gene_cor_Dev_IR$correlation, decreasing = TRUE), ]
+rnk_fpath <- file.path(output_dir, paste0('gene_correlation_Developmental_Injury_Response.rnk'))
+write.table(gene_cor_Dev_IR, file = rnk_fpath, sep = '\t', col.names = FALSE, row.names = FALSE, quote = FALSE)
+# specify gmt
+gsea_gmt_file <- '../../data/raw/gmt_files/baderlab_gmts/Human_GO_AllPathways_no_GO_iea_April_01_2018_symbol.gmt'
+# run GSEA
+SummExpDR::enrich_GSEA(gsea_rank_list_path = rnk_fpath,
+                      gsea_analysis_name = 'gene_correlation_Developmental_Injury_Response',
+                      gsea_rpt_label = 'report',
+                      gsea_out = output_dir,
+                      gsea_gmx = gsea_gmt_file,
+                      gsea_min_gs_size = 15, gsea_max_gs_size = 200)
+
+
+```
+
+## Session Info
+``` {r}
+Sys.time()
+sessionInfo()
+```

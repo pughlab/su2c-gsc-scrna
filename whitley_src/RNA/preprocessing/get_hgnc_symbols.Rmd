@@ -1,0 +1,30 @@
+---
+title: "Download HGNC list"
+output: html_notebook
+---
+
+
+
+```{r}
+library(biomaRt)
+human_mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl", host = "www.ensembl.org",
+                      ensemblRedirect = F)
+# listMarts()
+# biomart               version
+# 1 ENSEMBL_MART_ENSEMBL      Ensembl Genes 95
+# 2   ENSEMBL_MART_MOUSE      Mouse strains 95
+# 3     ENSEMBL_MART_SNP  Ensembl Variation 95
+# 4 ENSEMBL_MART_FUNCGEN Ensembl Regulation 95
+human_BM <- getBM(attributes = c( 'ensembl_gene_id', 'hgnc_symbol'), mart = human_mart)
+hgnc.symbols <- unique(human_BM$hgnc_symbol)
+
+setwd('~/projects/su2c_v2/scripts/RNA/preprocessing')
+preproc.data.folder <- '../../../data/preprocessed/RNA'
+misc.folder <- file.path(preproc.data.folder, 'misc')
+if (!dir.exists(misc.folder)) {
+  dir.create(misc.folder)
+}
+write.csv(hgnc.symbols, file = file.path(misc.folder, 'hgnc_symbols.csv'))
+```
+
+

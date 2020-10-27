@@ -1,0 +1,139 @@
+---
+title: "ssgsea + gsva scoring of GSC lines using markersets"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+# Overview:
+
+Here we do signature scoring for Roulois Interferon Response (Roulois 2015,  doi: 10.1016/j.cell.2015.07.056) + SU2C Dev + IR signatures (from bulk RNA-seq analysis of GSC lines, as shown in Richards et al. 2020 manuscript). Include Neftel 2019 signatures as well. Basic question is whether or not there is overlap + correlation of Roulois signature for response to interferon/dsRNA production with Injury Response signature, since interferon signaling featured pretty prominently in our prior pathway analysis on RNA differential expression between Developmental and Injury Response groups.
+
+# Load in Req'd packages + Data
+
+``` {r, include='FALSE'}
+library(GSVA, verbose = F)
+library(SummarizedExperiment, verbose = F)
+library(ComplexHeatmap, verbose = F)
+library(SummExpDR, verbose = F)
+library(limma, verbose = F)
+library(ggplot2, verbose = F)
+library(reshape2)
+```
+
+``` {r}
+print('System Time')
+print(Sys.time())
+top.dir <- '~/projects/su2c_v2'
+## load in data
+
+preproc.dir <- file.path(top.dir, '/data/preprocessed/')
+gset.dir <- file.path(preproc.dir, 'GeneSets/')
+gsets.file <- 'genesets_and_info_RNA_filt.rds'
+RNA.dir <- file.path(preproc.dir, 'RNA/SU2C_coh1234_nonSU2C/')
+RNA.clustering.results.dir <- file.path(top.dir, '/results/RNA/RNA_GSCs_clustering_DE')
+fpkm.file <- 'RNA_adult_GBM_fpkm_combat_nonSU2C.RData'
+genesets.and.info <- readRDS(file.path(gset.dir, gsets.file))
+load(file.path(RNA.dir, fpkm.file))
+## subset for GSC lines
+RNA_GSC_fpkm <- RNA_adult_GBM_fpkm_combat_nonSU2C[,RNA_adult_GBM_fpkm_combat_nonSU2C$Type_bis == 'L']
+
+## add cluster labels to fpkm matrix using clustering results. spectral_k2 = cluster labels
+load(file = file.path(RNA.clustering.results.dir, 'RNA_GSC_obj.RData'))
+RNA_GSC_metadata <- SummExpDR::colData(RNA.GSC.obj)
+RNA_GSC_fpkm$cluster <- RNA_GSC_metadata[colnames(RNA_GSC_fpkm), 'spectral_k2']
+# rename clusters to Developmental + Injury Response
+RNA_GSC_fpkm$cluster <- ifelse(RNA_GSC_fpkm$cluster == 1,
+                               'Developmental', 'Injury_Response')
+rm(RNA.GSC.obj)
+rm(RNA_GSC_metadata)
+
+```
+
+# Get GSVA Scores
+
+``` {r}
+genesets_use <- names(genesets.and.info$gene_set_list)[grep('RNA.GSC.c|Roulois',
+                                                         names(genesets.and.info$gene_set_list))]
+geneset_list <- genesets.and.info$gene_set_list[genesets_use]
+# rename c1 and c2 signatures to Developmental + Injury Response
+names(geneset_list)[grep('RNA.GSC.c1', names(geneset_list))] <- 'Developmental'
+names(geneset_list)[grep('RNA.GSC.c2', names(geneset_list))] <- 'Injury Response'
+# do scoring
+gsva_mat <- GSVA::gsva(assay(RNA_GSC_fpkm, 1) ,
+                       gset.idx.list = geneset_list,
+                       parallel.sz = 4,
+                       method = 'gsva')
+
+```
+
+# Heatmap of GSVA scores
+
+``` {r}
+meta.data <- colData(RNA_GSC_fpkm)
+hm_ann <- HeatmapAnnotation(df = data.frame(cluster = meta.data$cluster),
+                            col = list(cluster = c('Developmental' = 'red', 'Injury_Response' = 'blue')))
+Heatmap(gsva_mat,
+        top_annotation = hm_ann,
+        row_names_gp = gpar(fontsize = 20),
+        show_column_names = F,
+        name = 'GSVA',
+        col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red')))
+```
+
+# plot correlation of Roulois Interferon Signature
+
+``` {r}
+roulois_cor <- cor(gsva_mat['Roulois_Interferon_Response', ], gsva_mat['Injury Response', ], method = 'pearson')
+roulois_cor_pval <- cor.test(gsva_mat['Roulois_Interferon_Response', ], gsva_mat['Injury Response', ], method = 'pearson')$p.value
+
+plot(gsva_mat['Roulois_Interferon_Response', ], gsva_mat['Injury Response', ],
+     main = 'correlation, Roulois Interferon Response vs SU2C Injury Response',
+     sub = paste('correlation:', signif(roulois_cor, 2), '; p-val:', signif(roulois_cor_pval, 2)),
+     xlab = 'Roulois Interferon Response', ylab = 'Injury Response')
+
+```
+
+# Assess Overlap
+
+``` {r}
+# function to make heatmap with numbers
+hm_w_numbers <- function(color.mat, numeric.mat, color.value, numeric.value) {
+  color.melt <- melt(color.mat, value.name = color.value)
+  numeric.melt <- melt(numeric.mat, value.name = numeric.value)
+  p <- ggplot(data = color.melt, aes_(x=as.name('Var1'), y=as.name('Var2'), fill=as.name(color.value)))
+   p <- p +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 15),
+            axis.text.y = element_text(angle = 0, hjust = 1, size = 15)) +
+      geom_tile() + scale_fill_gradient2(low = 'darkturquoise', mid = 'white', high = 'red') +
+      geom_text(aes_(label = round(numeric.melt[,numeric.value], 2)), size = 6.0)
+  return(p)
+}
+# function to compare 2 lists of genesets colored by jaccard index, have text denote number of overlapping genes
+compare_probesets <- function(list1, list2 = list1) {
+  jaccard_mat <- calc_overlap(list1, list2, n.cores = 1, metric = 'jaccard')
+  num_overlap_mat <- calc_overlap(list1, list2, n.cores = 1, metric = 'num.ovr')
+  p <- hm_w_numbers(jaccard_mat, num_overlap_mat, color.value = 'jaccard', numeric.value = 'overlap')
+  return(p)
+}
+
+output <- capture.output(p <- compare_probesets(geneset_list))
+print(p)
+```
+
+18 of 22 genes from the Roulois interferon response signature are in teh Injury Response signature from our bulk RNA-seq analyses on GSC lines. So, there's overlap but the Injury response signature is composed of many more components than the singature captured for the roulois interferon response.
+
+``` {r}
+# genes common to Roulois signature and Injury Response Signature
+intersect(geneset_list$`Injury Response`, geneset_list$Roulois_Interferon_Response)
+# genes not in injury response signature but in Roulois Signature
+setdiff(geneset_list$Roulois_Interferon_Response, geneset_list$`Injury Response`)
+```
+
+# Session Info
+
+```{r}
+Sys.time()
+sessionInfo()
+```

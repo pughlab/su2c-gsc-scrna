@@ -1,0 +1,371 @@
+---
+title: "Clustering and Differential Expression, RNA-seq, SU2C + nonSU2C adult GBM lines, no nonSU2C samples, Dirks and Weiss labs separate"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+## Setup Directories + Load Data
+
+```{r, results='hide'}
+## get required packages
+library(SummarizedExperiment)
+library(SummExpDR)
+library(DESeq2)
+library(ggplot2)
+library(reshape2)
+## Setup directories
+top.dir <- '/home/owenwhitley/projects/su2c_v2/'
+scripts.dir <- file.path(top.dir, 'scripts/RNA/analysis')
+RNA.results.dir <- file.path(top.dir, 'results/RNA')
+# where results from this analysis GO, i.e. su2c_class objects with clustering results
+analysis.results.dir <- file.path(RNA.results.dir, 'RNA_GSCs_clustering_DE_Dirks_Weiss_Sep')
+# results from RNA_GSCs_clustering_DE.Rmd (clustering on full 72 sample dataset)
+full.results.dir <- file.path(RNA.results.dir, 'RNA_GSCs_clustering_DE')
+
+overwrite <- T
+if (overwrite) {
+  if (dir.exists(analysis.results.dir)) {
+    system(paste('rm -rf', analysis.results.dir))
+  }
+}
+
+for (dir.name in c(RNA.results.dir, analysis.results.dir)) {
+  if (!dir.exists(dir.name)) {
+    dir.create(dir.name)
+  }
+}
+setwd(scripts.dir)
+```
+
+```{r}
+data.dir <- file.path(top.dir, 'data/preprocessed/RNA/SU2C_coh1234_nonSU2C/')
+## Load data
+load(file = file.path(data.dir, 'RNA_adult_GBM_vst_combat_nonSU2C.RData'))
+load(file = file.path(data.dir, 'RNA_adult_GBM_dds.RData'))
+load(file = file.path(data.dir, 'RNA_adult_GBM_fpkm_combat_nonSU2C.RData'))
+dir(data.dir)
+
+## run checks
+stopifnot(all(rownames(RNA_adult_GBM_dds) == rownames(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(all(rownames(RNA_adult_GBM_fpkm_combat_nonSU2C) == rownames(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(all(colnames(RNA_adult_GBM_dds) == colnames(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(all(colnames(RNA_adult_GBM_fpkm_combat_nonSU2C) == colnames(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(identical(SummarizedExperiment::colData(RNA_adult_GBM_fpkm_combat_nonSU2C),
+                    SummarizedExperiment::colData(RNA_adult_GBM_vst_combat_nonSU2C)))
+stopifnot(all(sapply(colnames(SummarizedExperiment::colData(RNA_adult_GBM_dds)), FUN = function(x) {
+  if (any(is.na(SummarizedExperiment::colData(RNA_adult_GBM_dds)[,x]))) {
+  # skiep NA entries in DESeq2 dataset object
+    y <- T
+  } else {
+    y <- all(SummarizedExperiment::colData(RNA_adult_GBM_dds)[,x] == SummarizedExperiment::colData(RNA_adult_GBM_vst_combat_nonSU2C)[,x])
+  }
+})))
+
+summ.expt <- SummarizedExperiment(assays = list(counts = counts(RNA_adult_GBM_dds),
+                                                vst = SummarizedExperiment::assay(RNA_adult_GBM_vst_combat_nonSU2C, 1),
+                                                log2.fpkm = log2(SummarizedExperiment::assay(RNA_adult_GBM_fpkm_combat_nonSU2C, 1))),
+                                  colData = SummarizedExperiment::colData(RNA_adult_GBM_vst_combat_nonSU2C))
+## subset for SU2C lines only
+summ.expt <- summ.expt[,which(summ.expt$Type_bis == 'L')]
+# summ.expt <- summ.expt[,which(summ.expt$is.nonSU2C == F)]
+## subset for GSC lines from Dirks lab, SU2C samples only
+summ.expt.Dirks <- summ.expt[,which(summ.expt$Lab == 'Dirks')]
+## subset for GSC lines from Weiss Lab, SU2C samples only
+summ.expt.Weiss <- summ.expt[,which(summ.expt$Lab == 'Weiss')]
+rm(summ.expt)
+
+RNA.GSC.Dirks.only <- SummExpDR::create_SummExpDR(summ.expt.Dirks)
+
+RNA.GSC.Weiss.only <- SummExpDR::create_SummExpDR(summ.expt.Weiss)
+
+```
+
+# Dirks Lab Analyses
+
+## Run PCA + clustering
+
+``` {r}
+
+fname.Dirks <- 'RNA_GSC_Dirks_only.RData'
+
+remove.outliers <- TRUE
+
+if (file.exists(file.path(analysis.results.dir, fname.Dirks))) {
+  load(file.path(analysis.results.dir, fname.Dirks))
+} else {
+  # remove rows with no variance. If you don't do this, run_pca will throw and error from call to prcomp
+  RNA.GSC.Dirks.only <- SummExpDR::detect_outliers(RNA.GSC.Dirks.only, assay_use = 'vst')
+  metadata.w.outliers <- SummExpDR::colData(RNA.GSC.Dirks.only)
+  write.csv(file.path(analysis.results.dir, 'Dirks_metadata_w_outliers.csv'))
+  if (remove.outliers) {
+    # RNA.GSC.Dirks.only <- run_pca(RNA.GSC.Dirks.only, scale. = T, center = T, assay.id = 'vst')
+    # pca_plot_multi_feature(RNA.GSC.Dirks.only, features1 = c('is.outlier'), features2 = c('is.nonSU2C'),
+    #                      meta.data = NULL, save.plots = F, return.plots = F, print.plots = T,
+    #                      PCs1 = c(1:5), add_labels = T, label = 'SampleID_used')
+    RNA.GSC.Dirks.only <- SummExpDR::runPCA(RNA.GSC.Dirks.only, i = 'vst', std_norm = TRUE)
+    RNA.GSC.Dirks.only <- SummExpDR::detect_outliers(RNA.GSC.Dirks.only, assay_use = 'vst')
+  }
+  vst.dirks <- SummExpDR::assay(RNA.GSC.Dirks.only, i = 'vst')
+  const.var <- which(apply(vst.dirks, MARGIN = 1, FUN = var) == 0)
+  if (length(const.var) > 0) {
+    warning(paste('removing', length(const.var), 'rows with 0 variance'))
+    RNA.GSC.Dirks.only <- SummExpDR::subsetData(RNA.GSC.Dirks.only, rows = NULL, cols = colnames(vst.dirks))
+  }
+  
+  RNA.GSC.Dirks.only <- SummExpDR::runPCA(RNA.GSC.Dirks.only, i = 'vst', std_norm = TRUE)
+  
+  SummExpDR::screePlot(RNA.GSC.Dirks.only, key = 'PCA', dims_use = paste0('PC', 1:20))
+  
+  RNA.GSC.Dirks.only <- SummExpDR::run_multi_k_functions(x = RNA.GSC.Dirks.only, analysis_name = 'spectral', 
+                                                         k_use = 2:4, num_iter = 200, thresh_ARI = 0.80,
+                                                         thresh_proportion = 0.80, assay_use = 'vst',
+                                                         algorithm = 'spectral_kernlab', std_norm = T,
+                                                         sigma = 0.5, affi_K = 10)
+  RNA.GSC.Dirks.only <- SummExpDR::get_soln_k(RNA.GSC.Dirks.only, add_2_metadata = T, k = 2, pick_best_valid = F)
+  RNA.GSC.Dirks.only <- SummExpDR::get_soln_k(RNA.GSC.Dirks.only, add_2_metadata = T, k = 3, pick_best_valid = F)
+}
+
+
+# pca_plot_multi_feature(RNA.GSC.Dirks.only, features1 = c('spectral_k2', 'spectral_k3', 'Cohort'), 
+#                        features2 = c('is.nonSU2C'),
+#                        meta.data = NULL, save.plots = F, return.plots = F, print.plots = T,
+#                        PCs1 = c(1:5), add_labels = T, label = 'SampleID_used')
+
+SummExpDR::plotDR(RNA.GSC.Dirks.only, 'PC1', 'PC2', 'PCA', color_by = 'spectral_k2', 
+                  shape_by = 'is.nonSU2C', label = 'SampleID_used')
+
+SummExpDR::plotDR(RNA.GSC.Dirks.only, 'PC1', 'PC2', 'PCA', color_by = 'spectral_k3', 
+                  shape_by = 'is.nonSU2C', label = 'SampleID_used')
+
+SummExpDR::plotDR(RNA.GSC.Dirks.only, 'PC1', 'PC2', 'PCA', color_by = 'Cohort', 
+                  shape_by = 'is.nonSU2C', label = 'SampleID_used')
+
+
+SummExpDR::plot_sim_dist(RNA.GSC.Dirks.only, save_file = F, mode = 'full.vs.rs', clust_analysis = 'spectral')
+SummExpDR::plot_sim_dist(RNA.GSC.Dirks.only, save_file = F, mode = 'resample.vs.perm', clust_analysis = 'spectral')
+```
+
+__Compare Cluster Labels__
+``` {r}
+Dirks.metadata <- SummExpDR::colData(RNA.GSC.Dirks.only)
+load(file.path(full.results.dir, 'RNA_GSC_obj.RData'))
+for (k in 2:3) {
+  col.name.accessed <- paste0('spectral_k', k)
+  col.name.assigned <- paste0('Dirks_', col.name.accessed)
+  col.name.assigned.value <- Dirks.metadata[,col.name.accessed]
+  names(col.name.assigned.value) <- rownames(Dirks.metadata)
+  RNA.GSC.obj <- SummExpDR::addColData(RNA.GSC.obj, value = col.name.assigned.value, col_name = col.name.assigned)
+  RNA.GSC.obj@summ_exp[[col.name.assigned]][is.na(RNA.GSC.obj@summ_exp[[col.name.assigned]])] <- 'NA'
+  # p <- SummExpDR::plotPCA(object = RNA.GSC.obj, feature1 = col.name.assigned, 
+  #               feature2 = 'spectral_k2', PCs = c(1,2), save = F)
+  p <- SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = col.name.assigned, 
+                  shape_by = 'is.nonSU2C', label = 'SampleID_used')
+
+  full.metadata <- SummExpDR::colData(RNA.GSC.obj)
+  common.inds <- which(!is.na(full.metadata[,col.name.assigned]))
+  
+  ARI.dirks.v.all <- mclust::adjustedRandIndex(x = as.numeric(full.metadata[common.inds, col.name.assigned]),
+                                                y = as.numeric(full.metadata[common.inds, 'spectral_k2']))
+  p <- p + ggtitle('Dirks only clusters vs Clustering on all 72 GSCs', subtitle = paste('ARI for intersecting samples:', round(ARI.dirks.v.all, 2)))
+  dirks.cluster.names <- as.character(unique(full.metadata[,col.name.assigned]))
+  dirks.cluster.names <- dirks.cluster.names[order(dirks.cluster.names)]
+  print(p)
+}
+
+# check distribution of nonSU2C points
+# p <- pca_plot(object = RNA.GSC.obj, feature1 = 'is.nonSU2C', 
+#                 feature2 = 'spectral_k2', PCs = c(1,2), save = F)
+p <- SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'is.nonSU2C', 
+                  shape_by = 'spectral_k2', label = 'SampleID_used')
+print(p)
+
+# check lab
+p <- SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'Lab', 
+                  shape_by = 'is.nonSU2C', label = 'SampleID_used')
+print(p)
+
+```
+
+
+## Differential Expression
+
+#### Run Differential Expression
+``` {r}
+
+# run differential expression
+if (!file.exists(file.path(analysis.results.dir, fname.Dirks))) {
+  for (j in 1:2)  {
+    for (k in (j + 1):3) {
+     RNA.GSC.Dirks.only <- SummExpDR::run_diff_exp(expt_data = RNA.GSC.Dirks.only, class_type_use = 'spectral_k3',
+                                                  class1 = j, class2 = k, pipeline = 'DESEQ2', write_output = T,
+                                                  output_dir = analysis.results.dir, prefix = 'RNA_GSCs_',
+                                                  n_cores = 1, overwrite = T) 
+    }
+  }
+  save(RNA.GSC.Dirks.only, file = file.path(analysis.results.dir, fname.Dirks))
+} else {
+  load(file.path(analysis.results.dir, fname.Dirks))
+}
+# get marker genes and compare results to results obtained on full dataset
+
+de.genes.list <- list()
+for (j in 1:2) {
+  for (k in (j + 1):3) {
+    comparison.name <- paste0('RNA_GSCs_spectral_k3_',j, '_v_', k)
+    diff.exp.res.Dirks <- SummExpDR::getAnalyses(RNA.GSC.Dirks.only, key = comparison.name)$diff_exp
+    is.upreg.Dirks <- diff.exp.res.Dirks$log2FoldChange > 0
+    is.downreg.Dirks <- diff.exp.res.Dirks$log2FoldChange < 0
+    passes.fdr.Dirks <- diff.exp.res.Dirks$padj < 0.05
+    de.genes.list[[paste0('Dirks.c', j, '.v.c', k, '; c', j, '.upreg')]] <-
+      rownames(diff.exp.res.Dirks[is.upreg.Dirks & passes.fdr.Dirks, ])
+    de.genes.list[[paste0('Dirks.c', j, '.v.c', k, '; c', k, '.upreg')]] <-
+      rownames(diff.exp.res.Dirks[is.downreg.Dirks & passes.fdr.Dirks, ])
+  }
+  
+}
+
+```
+
+__Show overlap__ 
+``` {r}
+# Compare to results from clustering on full dataset
+RNA.GSC.c1.upreg <- read.csv(file.path(full.results.dir, 'spectral_k2_c1_upreg_FDR_0_05.csv'), stringsAsFactors = F)
+RNA.GSC.c1.upreg <- RNA.GSC.c1.upreg$x
+RNA.GSC.c2.upreg <- read.csv(file.path(full.results.dir, 'spectral_k2_c2_upreg_FDR_0_05.csv'), stringsAsFactors = F)
+RNA.GSC.c2.upreg <- RNA.GSC.c2.upreg$x
+
+genesets.compare <- list(All.GSC.c1.upreg = RNA.GSC.c1.upreg, All.GSC.c2.upreg = RNA.GSC.c2.upreg)
+genesets.compare <- c(genesets.compare, de.genes.list)
+names(genesets.compare) <- gsub('[.]', ' ', names(genesets.compare))
+names(genesets.compare) <- gsub('Dirks', 'Adherent', names(genesets.compare))
+overlapping.genes <- SummExpDR::calc_overlap(list1 = genesets.compare,
+                                             metric = 'num.ovr')
+overlap.coef <- SummExpDR::calc_overlap(list1 = genesets.compare,
+                                        metric = 'ovr.coef')
+clust.order <- hclust(as.dist(1 - overlap.coef))$order
+overlapping.genes <- overlapping.genes[clust.order, clust.order]
+
+melted_overlap <- melt(overlapping.genes, na.rm = TRUE)
+# Create a ggheatmap
+ggheatmap <- ggplot(melted_overlap, aes(Var2, Var1, fill = value))+
+ geom_tile(color = "white")+
+ scale_fill_gradient(low = "white", high = "red", space = "Lab", 
+    name="Overlapping Genes") +
+  theme_minimal()+ # minimal theme
+ theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust = 1))+
+ coord_fixed()
+ggheatmap <- ggheatmap +  geom_text(aes(Var2, Var1, label = value), color = "black", size = 4)
+print(ggheatmap)
+
+write.csv(overlapping.genes, 'cluster_markers_dirks_only_vs_full.csv')
+
+```
+
+# Weiss Lab Analyses
+
+## Run PCA + clustering
+
+``` {r}
+fname.Weiss <- 'RNA_GSC_Weiss_only.RData'
+
+remove.outliers <- TRUE
+
+if (file.exists(file.path(analysis.results.dir, fname.Weiss))) {
+  load(file.path(analysis.results.dir, fname.Weiss))
+} else {
+  # remove rows with no variance. If you don't do this, run_pca will throw and error from call to prcomp
+  RNA.GSC.Weiss.only <- SummExpDR::detect_outliers(RNA.GSC.Weiss.only, assay_use = 'vst')
+  metadata.w.outliers <- SummExpDR::colData(RNA.GSC.Weiss.only)
+  write.csv(file.path(analysis.results.dir, 'Weiss_metadata_w_outliers.csv'))
+  if (remove.outliers) {
+    # RNA.GSC.Weiss.only <- run_pca(RNA.GSC.Weiss.only, scale. = T, center = T, assay.id = 'vst')
+    # pca_plot_multi_feature(RNA.GSC.Weiss.only, features1 = c('is.outlier'), features2 = c('is.nonSU2C'),
+    #                      meta.data = NULL, save.plots = F, return.plots = F, print.plots = T,
+    #                      PCs1 = c(1:5), add_labels = T, label = 'SampleID_used')
+    RNA.GSC.Weiss.only <- SummExpDR::runPCA(RNA.GSC.Weiss.only, i = 'vst', std_norm = TRUE)
+    RNA.GSC.Weiss.only <- SummExpDR::detect_outliers(RNA.GSC.Weiss.only, assay_use = 'vst')
+  }
+  vst.Weiss <- SummExpDR::assay(RNA.GSC.Weiss.only, i = 'vst')
+  const.var <- which(apply(vst.Weiss, MARGIN = 1, FUN = var) == 0)
+  if (length(const.var) > 0) {
+    warning(paste('removing', length(const.var), 'rows with 0 variance'))
+    RNA.GSC.Weiss.only <- SummExpDR::subsetData(RNA.GSC.Weiss.only, rows = NULL, cols = colnames(vst.Weiss))
+  }
+  
+  RNA.GSC.Weiss.only <- SummExpDR::runPCA(RNA.GSC.Weiss.only, i = 'vst', std_norm = TRUE)
+  
+  SummExpDR::screePlot(RNA.GSC.Weiss.only, key = 'PCA', dims_use = paste0('PC', 1:20))
+  
+  RNA.GSC.Weiss.only <- SummExpDR::run_multi_k_functions(x = RNA.GSC.Weiss.only, analysis_name = 'spectral',  k_use = 2:4, 
+                                                         num_iter = 200, thresh_ARI = 0.80,
+                                                         thresh_proportion = 0.80, assay_use = 'vst',
+                                                         algorithm = 'spectral_kernlab', std_norm = T,
+                                                         sigma = 0.5, affi_K = 10)
+  RNA.GSC.Weiss.only <- SummExpDR::get_soln_k(RNA.GSC.Weiss.only, add_2_metadata = T, k = 2, pick_best_valid = F)
+  RNA.GSC.Weiss.only <- SummExpDR::get_soln_k(RNA.GSC.Weiss.only, add_2_metadata = T, k = 3, pick_best_valid = F)
+}
+
+
+# pca_plot_multi_feature(RNA.GSC.Weiss.only, features1 = c('spectral_k2', 'spectral_k3', 'Cohort'), 
+#                        features2 = c('is.nonSU2C'),
+#                        meta.data = NULL, save.plots = F, return.plots = F, print.plots = T,
+#                        PCs1 = c(1:5), add_labels = T, label = 'SampleID_used')
+
+SummExpDR::plotDR(RNA.GSC.Weiss.only, 'PC1', 'PC2', 'PCA', color_by = 'spectral_k2', 
+                  shape_by = 'Cohort', label = 'SampleID_used')
+
+SummExpDR::plotDR(RNA.GSC.Weiss.only, 'PC1', 'PC2', 'PCA', color_by = 'spectral_k3', 
+                  shape_by = 'Cohort', label = 'SampleID_used')
+
+SummExpDR::plot_sim_dist(RNA.GSC.Weiss.only, save_file = F, mode = 'full.vs.rs', clust_analysis = 'spectral')
+SummExpDR::plot_sim_dist(RNA.GSC.Weiss.only, save_file = F, mode = 'resample.vs.perm', clust_analysis = 'spectral')
+
+```
+
+__Compare Clustering Results to those obtained on full Dataset__
+``` {r}
+
+Weiss.metadata <- SummExpDR::colData(RNA.GSC.Weiss.only)
+for (k in 2:3) {
+  col.name.accessed <- paste0('spectral_k', k)
+  col.name.assigned <- paste0('Weiss_', col.name.accessed)
+  col.name.assigned.value <- Weiss.metadata[,col.name.accessed]
+  names(col.name.assigned.value) <- rownames(Weiss.metadata)
+  RNA.GSC.obj <- SummExpDR::addColData(RNA.GSC.obj, value = col.name.assigned.value, col_name = col.name.assigned)
+  RNA.GSC.obj@summ_exp[[col.name.assigned]][is.na(RNA.GSC.obj@summ_exp[[col.name.assigned]])] <- 'NA'
+  # p <- SummExpDR::plotPCA(object = RNA.GSC.obj, feature1 = col.name.assigned, 
+  #               feature2 = 'spectral_k2', PCs = c(1,2), save = F)
+  p <- SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = col.name.assigned, 
+                  shape_by = 'spectral_k2', label = 'SampleID_used')
+
+  full.metadata <- SummExpDR::colData(RNA.GSC.obj)
+  common.inds <- which(!is.na(full.metadata[,col.name.assigned]))
+  
+  ARI.Weiss.v.all <- mclust::adjustedRandIndex(x = as.numeric(full.metadata[common.inds, col.name.assigned]),
+                                                y = as.numeric(full.metadata[common.inds, 'spectral_k2']))
+  p <- p + ggtitle('Weiss only clusters vs Clustering on all 72 GSCs', subtitle = paste('ARI for intersecting samples:', round(ARI.Weiss.v.all, 2)))
+  Weiss.cluster.names <- as.character(unique(full.metadata[,col.name.assigned]))
+  Weiss.cluster.names <- Weiss.cluster.names[order(Weiss.cluster.names)]
+  print(p)
+}
+
+
+```
+
+
+
+#### Save Results
+__Save Clustering + DiffExp Results to File__
+``` {r}
+
+save(RNA.GSC.Weiss.only, file = file.path(analysis.results.dir, 'RNA_GSC_Weiss_only.RData'))
+```
+
+## Session Info
+
+``` {r}
+Sys.time()
+sessionInfo()
+```
