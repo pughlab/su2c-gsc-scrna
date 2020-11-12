@@ -1,0 +1,188 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+    toc: True
+    toc_depth: 4
+---
+
+# Overview:
+
+Examine SU2C live cell scRNA-seq Tumour data provided by Pugh Lab on Nov 2019. Examine distributions of
+markers and if there are roughly orthogonal Developmenta/Injury Response and stem/astrocyte gradients.
+Recall that Developmental/Injury response signatures correspond to differentially expressed genes from clusters obtained in bulk RNA-seq on GSC lines, and glioma stem cell markers come from differential expression between GSC lines and bulk tumour samples. Preprocessing + scoring of data was done by Laura Richards at Pugh Lab.
+
+# Load in Req'd Packages
+
+```{r, message=FALSE}
+
+library(Seurat)
+library(SummarizedExperiment)
+
+source('laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+
+## load scRNA data
+
+data_dir <- '../../data/raw/scRNA/Data/SU2C_GBM_Tumours_Nov_2019'
+data_file <- 'SU2C_TumourCellsOnly_Seurat_AUC_Nov2019.RData'
+# output_dir <- '../../results/scRNA/SU2C_GBM_Tumours_Nov_2019'
+# if (!dir.exists(output_dir)) {
+#   dir.create(output_dir)
+# }
+
+load(file.path(data_dir, data_file))
+
+```
+
+# Setup Metadata
+
+``` {r}
+# set all samples from same patient to same sample ID
+TumourCells@meta.data$SampleID <- sub('-[A-Z]', '', TumourCells@meta.data$SampleID)
+```
+
+``` {r}
+# add LR stem vs nonstem classification labels (seurat object loaded),
+# replace AUCell scores for plotting
+logistic_results <- readRDS('../../results/scRNA/laura_SU2C_GSCs_GBM_combined_Oct_2019_no_G800_L_logistic/logistic_regression_T_v_L_seurat.rds')
+logistic_meta <- logistic_results@meta.data
+logistic_meta <- logistic_meta[logistic_meta$SampleType == 'Tumour', ]
+
+logistic_meta <- logistic_meta[, colnames(logistic_meta)[grep('_AUC$|pred_class', colnames(logistic_meta))]]
+# change rownames to match those in tumour metadata
+rownames(logistic_meta) <- sub('GBM_', '', rownames(logistic_meta))
+rm(logistic_results)
+tumour_meta <- TumourCells@meta.data
+tumour_meta <- tumour_meta[,-grep('AUC$', colnames(tumour_meta))]
+tumour_meta <- cbind(tumour_meta, logistic_meta[rownames(tumour_meta), ])
+TumourCells@meta.data <- tumour_meta
+```
+
+``` {r}
+# calculate 'Injury Response'/'Development' score diff
+norm_x <- function(x) {
+  return((x - min(x))/(max(x) - min(x)))
+}
+inj_resp_norm <- norm_x(TumourCells@meta.data$RNA.GSC.c2_AUC)
+dev_norm <- norm_x(TumourCells@meta.data$RNA.GSC.c1_AUC)
+TumourCells@meta.data$Dev_IR_Diff <- dev_norm - inj_resp_norm
+stem_norm <- norm_x(TumourCells@meta.data$glioma.stem.cell_AUC)
+astro_norm <- norm_x(TumourCells@meta.data$cahoy_astrocyte_AUC)
+TumourCells@meta.data$Stem_Astro_Diff <- stem_norm - astro_norm
+```
+
+``` {r}
+# rename RNA.GSC.c1_AUC + RNA.GSC.c2_AUC to Developmental_AUC, Injury_Response_AUC, respectively
+# the former names were used to denote scores for cluster marker sets, the latter are names
+# we settled on for the Richards et al. 2020 manuscript
+TumourCells@meta.data$Developmental_AUC <- TumourCells@meta.data$RNA.GSC.c1_AUC
+TumourCells@meta.data$Injury_Response_AUC <- TumourCells@meta.data$RNA.GSC.c2_AUC
+```
+
+# PCA
+
+## Elbow/Scree Plots
+
+``` {r}
+PCElbowPlot(TumourCells)
+PC_var <- apply(TumourCells@dr$pca@cell.embeddings, MARGIN = 2, var)
+PC_var
+total_var <- sum(apply(TumourCells@scale.data, MARGIN = 1, var))
+
+PC_pct_var <- PC_var/total_var
+
+plot((PC_pct_var*100)[1:20], ylab = 'percent variance', xlab = 'PC')
+```
+
+
+``` {r}
+# define scores to plot
+# scores_plot <- colnames(TumourCells@meta.data)[grep('AUC$', colnames(TumourCells@meta.data))]
+# score_regex <- paste('cahoy_astro', 'cahoy_oligodendrocyte', 'Neftel', 'glioma.stem.cell', 'RNA.GSC.c[1-2]', sep = '|')
+# scores_plot <- scores_plot[grep(score_regex, scores_plot)]
+# scores_plot <- c(scores_plot, 'IR_Dev_Score_Diff')
+neftel_scores <- colnames(TumourCells@meta.data)[grep('^Neftel([A-z0-9]|_|\\.)*AUC$',
+                                                      colnames(TumourCells@meta.data))]
+scores_plot <- c('Dev_IR_Diff', 'Stem_Astro_Diff', 'cahoy_astro_young_AUC', 'Suva_Stemness_AUC',
+                 neftel_scores)
+feats_plot <- c('PatientID', 'pred_class', scores_plot)
+```
+
+## PCA plots
+
+``` {r, results='asis'}
+
+for (PC_pair in list(c(1,2), c(2,3), c(3,4))) {
+  dim1 <- PC_pair[1]
+  dim2 <- PC_pair[2]
+  cat(paste0('\n\n## PC', dim1, ' PC', dim2, '\n\n'))
+  make_dr_plots(TumourCells, dim1 = dim1, dim2 = dim2, reduction.use = 'pca', 
+                feats_plot = feats_plot, legend_pt_size = 5.0)
+  cat('\n\n')
+}
+
+```
+
+# Correlation Plots
+
+Assess relationship between stem astro gradient and Dev/IR gradient
+
+``` {r, results='asis'}
+# unique values for sample ids
+all_samples <- unique(TumourCells@meta.data$SampleID)
+# unique values for predicted class
+unique_pred_class <- unique(TumourCells@meta.data$pred_class)
+# correlation plot colors
+corplot_colors <- c('Dev_IR_Diff', 'Stem_Astro_Diff', 'Suva_Stemness_AUC', neftel_scores, 'pred_class')
+# correlation pairs
+pairs_use <- list(c('Developmental_AUC', 'Injury_Response_AUC'),
+                      c('glioma.stem.cell_AUC', 'cahoy_astrocyte_AUC'),
+                      c('Dev_IR_Diff', 'Stem_Astro_Diff'))
+for (filter_by in c('NULL', 'SampleID', 'pred_class')) {
+  if (filter_by == 'NULL') {
+    filter_by <- NULL
+    unique_classes <- 'NULL'
+    filter_by_label <- 'None'
+  } else if (filter_by == 'SampleID') {
+    unique_classes <- all_samples
+    filter_by_label <- filter_by
+  } else if (filter_by == 'pred_class') {
+    unique_classes <- unique_pred_class
+    filter_by_label <- filter_by
+  } else {
+    stop('unexpected filter_by value')
+  }
+  cat(paste('\n\n## Filter Criterion:', filter_by_label, '\n\n'))
+  for (filter_class in unique_classes) {
+    if (filter_class == 'NULL') {
+      filter_class <- NULL
+      class_header_label <- 'All Cells'
+    } else {
+      class_header_label <- filter_class
+    }
+    cat(paste('\n\n###', class_header_label, '\n\n'))
+    
+    for (var_pair in pairs_use) {
+      cat(paste('\n\n####', var_pair[1], 'vs', var_pair[2], '\n\n'))
+      for (color_use in corplot_colors) {
+        p <- corplot_2_var(TumourCells, 
+                           var1 = var_pair[1], 
+                           var2 = var_pair[2],
+                           color_by = color_use, 
+                           filter_by = filter_by, 
+                           filter_class = filter_class,
+                           method = 'pearson')
+        print(p)
+      }
+    }
+    cat('\n\n')
+  }
+}
+```
+
+# Session Info
+``` {r}
+Sys.time()
+sessionInfo()
+```

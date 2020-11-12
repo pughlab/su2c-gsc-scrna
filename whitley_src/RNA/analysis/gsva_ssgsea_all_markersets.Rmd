@@ -1,0 +1,907 @@
+---
+title: "ssgsea + gsva scoring of GSC lines using markersets"
+output:
+  html_document:
+    toc: true
+    df_print: paged
+---
+
+**Overview**
+Score RNA seq data for GSC lines from Dirks + Weiss lab for SU2C project using 
+ssgsea + GSVA. Use markersets pertaining to neural development as well as
+GBM subtypes. Note that for Richards et al. 2020 publication, RNA GSC cluster 1 corresponds to
+Developmental cluster, RNA GSC cluster 2 corresponds to Injury Response cluster
+
+**Run ssgsea + gsva on all markersets**
+
+_Load in Data_
+
+``` {r, include='FALSE'}
+library(GSVA, verbose = F)
+library(SummarizedExperiment, verbose = F)
+library(ComplexHeatmap, verbose = F)
+library(biomaRt, verbose = F)
+library(gProfileR, verbose = F)
+library(readxl, verbose = F)
+library(limma, verbose = F)
+library(ggplot2, verbose = F)
+library(reshape2, verbose = F)
+library(cowplot)
+library(ggrepel)
+library(SummExpDR)
+```
+
+``` {r}
+print('System Time')
+print(Sys.time())
+top.dir <- '~/projects/su2c_v2'
+## load in data
+
+preproc.dir <- file.path(top.dir, '/data/preprocessed/')
+gset.dir <- file.path(preproc.dir, 'GeneSets/')
+gsets.file <- 'genesets_and_info_RNA_filt.rds'
+RNA.dir <- file.path(preproc.dir, 'RNA/SU2C_coh1234_nonSU2C/')
+RNA.clustering.results.dir <- file.path(top.dir, '/results/RNA/RNA_GSCs_clustering_DE')
+fpkm.file <- 'RNA_adult_GBM_fpkm_combat_nonSU2C.RData'
+genesets.and.info <- readRDS(file.path(gset.dir, gsets.file))
+load(file.path(RNA.dir, fpkm.file))
+
+## add cluster labels to fpkm matrix using clustering results. spectral_k2 = cluster labels
+load(file = file.path(RNA.clustering.results.dir, 'RNA_GSC_obj.RData'))
+RNA_GSC_metadata <- SummExpDR::colData(RNA.GSC.obj)
+RNA_adult_GBM_fpkm_combat_nonSU2C$cluster <- RNA_GSC_metadata[colnames(RNA_adult_GBM_fpkm_combat_nonSU2C),
+                                                        'spectral_k2']
+rm(RNA.GSC.obj)
+rm(RNA_GSC_metadata)
+
+## setup output directory
+RNA.results.dir <- file.path(top.dir, 'results/RNA')
+analysis.results.dir <- file.path(RNA.results.dir, 'gsva_ssgsea_all_markersets')
+overwrite <- T
+if (dir.exists(analysis.results.dir) && overwrite) {
+  system(paste('rm -rf ', analysis.results.dir))
+}
+
+for (dir.name in c(RNA.results.dir, analysis.results.dir)) {
+  if (!dir.exists(dir.name)) {
+    dir.create(dir.name)
+  }
+}
+
+```
+
+_Examine Gene Sets and Data_
+
+Current genesets were all filtered for symbols within HGNC symbols
+from ENSEMBL version 95 (see preprocess_GeneSets.R)
+
+``` {r}
+genesets <- genesets.and.info$gene_set_list
+geneset.info <- genesets.and.info$geneset.info
+rm(genesets.and.info)
+```
+
+Geneset's were from the following sources: Zhong et al. 2018, Mizrak et al. 2019, Nowakowski et al. 2017,
+Cahoy et al. 2008, Verhaak et al. 2010 (TCGA GBM subtypes), Zamian 2012 (a1/a2 reactive astrocytes),
+and own RNA-seq clustering + diff exp analysis.
+
+All gene sets can be assumed to be upregulated genes for the specified cell type. We are removing any with 'downreg' suffix to simplify our analysis
+
+```{r}
+names(genesets)
+geneset.info
+
+genesets <- genesets[-grep('downreg', names(genesets))]
+# TODO: in preprocessing script for genesets remove '-' character
+names(genesets) <- sub('-', '_', names(genesets))
+## make human readable geneset names for figures. Note that this may
+## cause some name collisions. This is not an issue as the mapping will only be done
+## for plotting or saving tables, and the mapping function will throw an error if duplicate
+## names are passed to rownames of matrix
+human.readable.names <- names(genesets)
+human.readable.names <- sub('(nowakowski|Zhong|mizrak|cahoy)_', '', human.readable.names)
+human.readable.names <- sub('_upreg', '', human.readable.names)
+human.readable.names <- gsub('_', ' ', human.readable.names)
+human.readable.names <- sub('astro in vivo', 'in vivo astrocytes', human.readable.names)
+human.readable.names <- sub('RNA.GSC.c', 'GSC RNA cluster', human.readable.names)
+human.readable.names[grep('U[0-9]', human.readable.names)] <- paste(human.readable.names[grep('U[0-9]', human.readable.names)], '(unknown)')
+human.readable.names[grep('a[0-9].astro', human.readable.names)] <- sub('.astro', ' astrocyte', human.readable.names[grep('a[0-9].astro', human.readable.names)])
+names(human.readable.names) <- names(genesets)
+human.readable.names[grep('mizrak', names(human.readable.names))] <- paste(human.readable.names[grep('mizrak', names(human.readable.names))], '(Mizrak)')
+human.readable.names[grep('nowakowski_(Endothelial|Microglia|OPC)', names(human.readable.names))] <- paste(human.readable.names[grep('nowakowski_(Endothelial|Microglia|OPC)', names(human.readable.names))], '(Nowakowski)')
+human.readable.names[grep('Zhong_(Endothelial|Microglia|OPC)', names(human.readable.names))] <- paste(human.readable.names[grep('Zhong_(Endothelial|Microglia|OPC)', names(human.readable.names))], '(Zhong)')
+
+## human readable gene name maping
+hr.name.table <- data.frame(original.name = names(human.readable.names), human.readable = human.readable.names, row.names = 1:length(human.readable.names))
+hr.name.table[order(hr.name.table$human.readable),]
+
+map_2_hr <- function(x) {
+  ## function to map internal geneset names to human readable names
+  stopifnot(is.matrix(x) || is.data.frame(x))
+  if (all(rownames(x) %in% names(human.readable.names))) {
+    rownames(x) <- human.readable.names[rownames(x)]
+    print('name mapping, rows')
+    human.readable.names[rownames(x)]
+  }
+  if (all(colnames(x) %in% names(human.readable.names))) {
+    colnames(x) <- human.readable.names[colnames(x)]
+    print('name mapping, columns')
+    human.readable.names[colnames(x)]
+  }
+  return(x)
+}
+
+
+```
+
+We are using batch corrected fpkm values. For details on batch correction + preprocessing,
+see reports for RNA_explore_batch_correction.Rmd and owen_RNA_preprocess_adult_GBM_coh1234_nonSU2C.Rmd.
+The batch correction was done in log2(fpkm) space
+
+``` {r}
+RNA_adult_GBM_fpkm_combat_nonSU2C
+```
+
+We'll subset for GSC lines
+
+``` {r}
+
+
+RNA_GSC_line <- RNA_adult_GBM_fpkm_combat_nonSU2C[,RNA_adult_GBM_fpkm_combat_nonSU2C$Type_bis == 'L']
+RNA_GSC_line
+colnames(RNA_GSC_line) <- RNA_GSC_line$SampleID_used
+as.data.frame(SummarizedExperiment::colData(RNA_GSC_line))
+
+```
+
+And add cluster labels
+
+``` {r}
+
+## add cluster labels to fpkm matrix. 
+load(file = file.path(RNA.clustering.results.dir, 'RNA_GSC_obj.RData'))
+fetched_data <- fetchData(RNA.GSC.obj, c('spectral_k2', 'SampleID_used'))
+clust_labs <- fetched_data$spectral_k2
+names(clust_labs) <- fetched_data$SampleID_used
+RNA_GSC_line$cluster <- clust_labs[colnames(RNA_GSC_line)]
+rm(RNA.GSC.obj)
+
+```
+
+# GSVA and ssgsea Scoring 
+
+```{r}
+GSC.log2.fpkm <- log2(SummarizedExperiment::assay(RNA_GSC_line, 1))
+GSC.ssgsea <- gsva(expr = GSC.log2.fpkm, 
+                   gset.idx.list = genesets,
+                   method = 'ssgsea',
+                   min.sz = 10,
+                   ssgsea.norm = T,
+                   parallel.sz = 0,
+                   verbose = F)
+
+GSC.gsva <- gsva(expr = GSC.log2.fpkm,
+                 gset.idx.list = genesets,
+                 method = 'gsva',
+                 kcdf = 'Gaussian',
+                 min.sz = 10,
+                 parallel.sz = 0,
+                 verbose = F)
+
+save(GSC.ssgsea, file = file.path(analysis.results.dir, 'GSC_ssgsea.RData'))
+save(GSC.gsva, file = file.path(analysis.results.dir, 'GSC_gsva.RData'))
+```
+
+## Heatmap of GSVA scores
+
+``` {r}
+meta.data <- SummarizedExperiment::colData(RNA_GSC_line)
+hm_ann <- HeatmapAnnotation(df = meta.data[, c('Lab', 'cluster')],
+                                  col = list(Lab = c('Dirks' = 'turquoise',
+                                                     'Weiss' = 'magenta'),
+                                             cluster = c('1' = 'red',
+                                                         '2' = 'blue')))
+Heatmap(GSC.gsva,
+        top_annotation = hm_ann,
+        row_names_gp = gpar(fontsize = 3),
+        show_column_names = F,
+        name = 'GSVA',
+        col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red')))
+```
+
+
+Fiona Coutinho at Dirks Lab is interested in which lines score strongest for cluster 1 and cluster 2
+signatures. We'll take a look here and also save the results to a csv file.
+
+``` {r}
+GSVA.owen.clusters <- data.frame(t(GSC.gsva[c('RNA.GSC.c1', 'RNA.GSC.c2'),]))
+GSVA.owen.clusters <- GSVA.owen.clusters[order(GSVA.owen.clusters$RNA.GSC.c1),]
+write.csv(GSVA.owen.clusters, file = file.path(analysis.results.dir, 'GSVA_owen_clusters.csv'))
+```
+
+## Quick examination of gsva scores for Owen's cluster makers as well as other markers of interest
+
+Markersets of interest include blocks of genesets that do not separate by cluster 1 and cluster 2,
+as well as some that do. Those that do not separate by cluster 1 and cluster 2 may represent another
+source of heterogeneity in data
+
+``` {r}
+load(file = file.path(RNA.clustering.results.dir, 'RNA_GSC_obj.RData'))
+metadata.add <- as.data.frame(t(GSC.gsva))
+sample.name <- SummExpDR::getSummExp(RNA.GSC.obj)$Sample
+names(sample.name) <- SummExpDR::getSummExp(RNA.GSC.obj)$SampleID_used
+rownames(metadata.add) <- sample.name[rownames(metadata.add)]
+RNA.GSC.obj <- SummExpDR::addColData(RNA.GSC.obj, value = metadata.add)
+
+# # owen's markers from bulk-RNA-seq clustering analysis. here we're edintg the text labels to be repelled from
+# # one another
+# c1_c2_plots <- pca_plot_multi_feature(object = RNA.GSC.obj, features1 = c('RNA.GSC.c1', 'RNA.GSC.c2'),
+#                                      features2 = c('spectral_k2'),
+#                                       PCs1 = 1:2, add_labels = F, label = 'SampleID_used', return.plots = T, print.plots = F, save.plots = F,
+#                                       color.scale = 'scale_color_gradient2')
+# ext_plot_data <- cbind(retrieve_metadata(RNA.GSC.obj)[RNA.GSC.obj@expt.data$Sample,], 
+#                        retrieve_data_mat(RNA.GSC.obj, 'pca')[RNA.GSC.obj@expt.data$Sample,])
+# for (p in c1_c2_plots) {
+#   p <- p + geom_text_repel(data = as.data.frame(ext_plot_data), mapping = aes(x = PC1, y = PC2, label = SampleID_used), size = 2.0)
+#   p <- p + theme_cowplot()
+#   print(p)
+# }
+
+# RNA GSC c1 + c2 scores
+SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'RNA.GSC.c1', 
+                  shape_by = 'spectral_k2', label = 'SampleID_used', lab_size = 2.0)
+SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = 'RNA.GSC.c2', 
+                  shape_by = 'spectral_k2', label = 'SampleID_used', lab_size = 2.0)
+
+# NPC/IPC marker genes
+
+for (feat in c('Zhong_NPCs_upreg', "mizrak_aNSC1", "nowakowski_IPC_div1_upreg", "nowakowski_IPC_div2_upreg")) {
+  p <- SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = feat, 
+                  shape_by = 'spectral_k2', label = 'SampleID_used', lab_size = 2.0)
+  print(p)
+}
+for (feat in c('Zhong_NPCs_upreg', "mizrak_aNSC1", "nowakowski_IPC_div1_upreg", "nowakowski_IPC_div2_upreg")) {
+  p <- SummExpDR::plotDR(RNA.GSC.obj, 'PC2', 'PC3', 'PCA', color_by = feat, 
+                  shape_by = 'spectral_k2', label = 'SampleID_used', lab_size = 2.0)
+  print(p)
+}
+
+
+# RG associated genes
+# pca_plot_multi_feature(object = RNA.GSC.obj, features1 = names(genesets)[grep('RG', names(genesets))],
+#                        features2 = c('spectral_k2'),
+#                         PCs1 = 1:2, add_labels = T, label = 'SampleID_used', return.plots = F, print.plots = T, save.plots = F,
+#                         color.scale = 'scale_color_gradient2')
+
+for (feat in names(genesets)[grep('RG', names(genesets))]) {
+  p <- SummExpDR::plotDR(RNA.GSC.obj, 'PC1', 'PC2', 'PCA', color_by = feat, 
+                  shape_by = 'spectral_k2', label = 'SampleID_used', lab_size = 2.0)
+  print(p)
+}
+for (feat in names(genesets)[grep('RG', names(genesets))]) {
+  p <- SummExpDR::plotDR(RNA.GSC.obj, 'PC2', 'PC3', 'PCA', color_by = feat, 
+                  shape_by = 'spectral_k2', label = 'SampleID_used', lab_size = 2.0)
+  print(p)
+}
+```
+
+## Differential Pathway Enrichment
+Differential pathway enrichment. We'll only use differentially enriched pathways in our initial exploration
+
+``` {r}
+
+design.mat <- model.matrix(~factor(RNA_GSC_line$cluster))
+colnames(design.mat)[2] <- 'cluster 2'
+fit <- lmFit(object = GSC.gsva, design = design.mat)
+fit <- eBayes(fit = fit)
+DEgeneSets <- topTable(fit, coef="cluster 2", number=Inf, p.value=0.05, adjust.method="BH")
+
+DEgeneSets
+## we have 56 differentially expressed genesets
+nrow(DEgeneSets)
+length(genesets)
+
+genesets.de <- genesets[rownames(DEgeneSets)]
+```
+## Look for pathways that are enriched in the 'middle cells'
+``` {r}
+## we will look for samples whose GSVA scores negatively correlate with the absolute value of RNA GSC c1 and c2 score
+## Cell lines that are highly upregulated or downregulated for RNA GSC c1 and c2 genes should have high value, and conversely,
+## those that are in the middle should have low absolute value of GSVA score
+
+neg.cor.genesets <- c()
+for (i in 1:2) {
+  gsva.RNA.cx.abs.cor <-apply(GSC.gsva, MARGIN = 1, FUN = function(x) {cor(x, abs(GSC.gsva[paste0('RNA.GSC.c', i),]), method = 'spearman')})
+  hist(gsva.RNA.cx.abs.cor, main = paste('correlation GSVA scores of RNA cluster ', i, 'absolute GSVA'))
+  # print(paste('Most negatively correlated genesets in relation to RNA cluster ', i, 'absolute GSVA'))
+  neg.cor.genesets <- cbind(neg.cor.genesets, names(head(gsva.RNA.cx.abs.cor[order(gsva.RNA.cx.abs.cor)])))
+  neg.cor.genesets <- cbind(neg.cor.genesets, head(gsva.RNA.cx.abs.cor[order(gsva.RNA.cx.abs.cor)]))
+}
+colnames(neg.cor.genesets) <- c('names c1', 'spearman correlation', 'names c2', 'spearman correlation')
+data.frame(neg.cor.genesets)
+
+plot(GSC.gsva['RNA.GSC.c2', ], GSC.gsva['TCGA_CL', ])
+plot(abs(GSC.gsva['RNA.GSC.c2', ]), GSC.gsva['TCGA_CL', ])
+
+## it appears that we haven't identified any gene sets that are 'enriched in the middle'.
+```
+
+Table shows names + spearman correlation of top 6 genesets negatively correlated with absolute value of cluster 1 gsva score (columns 1-2) or absolute value of cluster 2 gsva score (columns 3-4)
+
+## Heatmaps of differentially expressed genesets
+
+### ssgsea of markersets on GSC lines
+
+``` {r dev='svg'}
+hm.ssgsea <- Heatmap(GSC.ssgsea[names(genesets.de),],
+                    top_annotation = hm_ann,
+                    row_names_gp = gpar(fontsize = 3),
+                    show_column_names = F,
+                    name = 'ssgsea',
+                    col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red')))
+draw(hm.ssgsea)
+```
+
+It's worth noting that we don't have any downregulated signatures here, which could be explained by the fact that we're dealing with brain tumour derived stem cells. It wouldn't be too surprising to have developmental programs for the brain as well as all the TCGA programs consistently upregulated in our cells relative to other gene sets, just with the upregulation happening at different levels across cell lines.
+
+
+### gsva of markersets on GSC lines
+
+```{r dev='svg'}
+hm.gsva <- Heatmap(GSC.gsva[names(genesets.de),],
+                  top_annotation = hm_ann,
+                  row_names_gp = gpar(fontsize = 3),
+                  show_column_names = F,
+                  name = 'GSVA',
+                  col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red')))
+draw(hm.gsva)
+```
+
+
+It appears that besides the signatures derived from the clusters, TCGA PN, Zhong and Nowakowski OPC are consistently upregulated in cluster 1, while A1/A2 astrocyte signatures and TCGA MES are upregulated in cluster 2. Cluster 1 is also upregulated for a variety of astrocyte markersets, including nowakowski and zhong astrocyte markersets, and many of the Mizrak et al. 2019 cluster marker sets, i.e. Mizrak Astro 3 and Astro 5, Mizrak Neuron 2) (note that the Mizrak et al. 2019 markersets for astrocytes were defined clustering and doing differential expression for a pool of astrocytes and ependymal cells, and the markersets for neurons were defined by clustering entire mouse brain dataset and then
+applying their binomial test). 
+
+Something worth noting is that often, upregulated genesets will not consistently separate one cluster from another, e.g. with a1/a2 signatures (upregulated in cluster 2 but high in some lines for cluster 1). My interpretation of the results presented is that our clustering analysis identified the major source of signal in GSC lines, a signal that correlates well but imperfectly with expression of other cell type markers. A possible explanation for this would be that the signal we've identified can bias the likelihood of certain expression programs being active, with heterogeneity coming from sample specific factors.
+
+<!-- ## Examine Genesets of interest based off of single cell results -->
+<!-- see 25_BTSC_scoring.Rmd on branch scRNA for more details.  -->
+<!-- ``` {r} -->
+<!-- # NSC makers -->
+
+<!-- ``` -->
+
+## get overlap of marker sets 
+
+``` {r dev='svg'}
+# ## get hgnc symbols for the 'master set' for fisher's exact test
+# human_mart <- useMart("ensembl", dataset = "hsapiens_gene_ensembl", host = "www.ensembl.org",
+#                       ensemblRedirect = F)
+# listMarts()
+# # biomart               version
+# # 1 ENSEMBL_MART_ENSEMBL      Ensembl Genes 95
+# # 2   ENSEMBL_MART_MOUSE      Mouse strains 95
+# # 3     ENSEMBL_MART_SNP  Ensembl Variation 95
+# # 4 ENSEMBL_MART_FUNCGEN Ensembl Regulation 95
+# 
+# human_BM <- getBM(attributes = c( 'ensembl_gene_id', 'hgnc_symbol'), mart = human_mart)
+# hgnc.symbols <- unique(human_BM$hgnc_symbol)
+
+## get SU2C RNA genes master geneset (i.e. all genes used in analysis for RNA-seq)
+## this is so we don't use a host of genes that were never used in the diff exp
+## analysis for the fisher's exact test for overlap.
+load(file = file.path(gset.dir, 'SU2C_all_RNA_genes.RData'))
+
+## calculate # overlapping genes, overlap coefficient, jaccard index, and fisher's exact test -log10 pvalue
+overlapping.genes <- SummExpDR::calc_overlap(list1 = genesets, metric = 'num.ovr')
+overlap.coef <- SummExpDR::calc_overlap(list1 = genesets, metric = 'ovr.coef')
+jaccard.coef <- SummExpDR::calc_overlap(list1 = genesets, metric = 'jaccard')
+log10.fisher.pval <- SummExpDR::calc_overlap(list1 = genesets, metric = 'fisher.p', master_set = SU2C.all.RNA.genes)
+log10.fisher.pval[which(log10.fisher.pval == Inf)] <- max(log10.fisher.pval[which(log10.fisher.pval != Inf)])
+
+# get clustering results for differentially expressed genes
+clust.result <- hclust(as.dist(1-overlap.coef[names(genesets.de), names(genesets.de)]), method = 'complete')
+hm.genes <- Heatmap(overlapping.genes[names(genesets.de), names(genesets.de)], row_names_gp = gpar(fontsize = 3),
+                    column_names_gp = gpar(fontsize = 3), name = 'overlapping genes', 
+                    cluster_rows = clust.result, cluster_columns = clust.result, 
+                    row_dend_reorder = F, column_dend_reorder = F)
+draw(hm.genes)
+
+hm.overlap <- Heatmap(overlap.coef[names(genesets.de), names(genesets.de)], row_names_gp = gpar(fontsize = 3),
+                      column_names_gp = gpar(fontsize = 3), name = 'overlap coefficient',
+                      cluster_rows = clust.result, cluster_columns = clust.result, 
+                      row_dend_reorder = F, column_dend_reorder = F)
+                  
+draw(hm.overlap)
+
+hm.jaccard <- Heatmap(jaccard.coef[names(genesets.de), names(genesets.de)], row_names_gp = gpar(fontsize = 3), 
+                      column_names_gp = gpar(fontsize = 3), name = 'jaccard index',
+                      cluster_rows = clust.result, cluster_columns = clust.result, 
+                      row_dend_reorder = F, column_dend_reorder = F)
+draw(hm.jaccard)
+
+hm.fisher <- Heatmap(log10.fisher.pval[names(genesets.de), names(genesets.de)], row_names_gp = gpar(fontsize = 3), 
+                      column_names_gp = gpar(fontsize = 3), name = '-log10-fisher pvalue (two sided)',
+                      cluster_rows = clust.result, cluster_columns = clust.result, 
+                      row_dend_reorder = F, column_dend_reorder = F)
+draw(hm.fisher)
+```
+
+
+Note that genesets that tend to show substantial amounts of overlap are Nowakowski developmental signatures from similar cell types discr.
+E.g. nowakowski IPC and RG downreg signatures from outside MGE will be overlap with similar IPC/RG downreg signatures derived from inside MGE. TCGA_MES and a2 astrocyte signatures heavily overlap RNA k2 c2 signature, although TCGA_mes and a2 astrocyte do not heavily overlap one another.
+
+Generally speaking, if signatures not defined from similar cell type, they do not overlap much.
+
+<!-- ## Correlation of GSVA Scores -->
+
+<!-- Here we'd like to determine the degree of correlation between GSVA scores among differentially active signatures, -->
+<!-- and see which ones show the highest correlation with our cluster markers -->
+
+<!-- ``` {r dev='svg'} -->
+<!-- correlation.gsva <- SummExpDR::get_cor_vals(X = , Y = , method = 'spearman') -->
+<!-- correlation.gsva <- calc_correlation_mat(expt.data = GSC.gsva, -->
+<!--                                          items = 'features', -->
+<!--                                          method = 'spearman', -->
+<!--                                          log10.pval.mat = F) -->
+
+<!-- dim(correlation.gsva) -->
+<!-- # plot correslation of diff exp genes -->
+<!-- hm.cor.gsva <- Heatmap(correlation.gsva[names(genesets.de), names(genesets.de)], row_names_gp = gpar(fontsize = 3), -->
+<!--                       column_names_gp = gpar(fontsize = 3), name = 'spearman correlation gsva', -->
+<!--                       row_dend_reorder = F, column_dend_reorder = F) -->
+<!-- draw(hm.cor.gsva) -->
+<!-- ``` -->
+
+<!-- Above heatmap shows correlation of GSVA scores among differentially active pathways -->
+
+<!-- Let's find the top 11 pathways that correlate with RNA.GSC.c1 and the top 9 for RNA.GSC.c2. -->
+
+<!-- ``` {r dev='svg'} -->
+
+<!-- spearman.owen.RNA.c1 <- correlation.gsva['RNA.GSC.c1',] -->
+<!-- spearman.owen.RNA.c2 <- correlation.gsva['RNA.GSC.c2',] -->
+
+<!-- # p <- ggplot(data = data.frame(spearman.owen.RNA.c1 = spearman.owen.RNA.c1, -->
+<!-- #                               spearman.owen.RNA.c2 = spearman.owen.RNA.c2, -->
+<!-- #                               geneset.name = names(spearman.owen.RNA.c1)), -->
+<!-- #             aes(x = spearman.owen.RNA.c1, y = spearman.owen.RNA.c2, label = geneset.name)) -->
+<!-- # p <- p + geom_point(color = 'magenta') + geom_text(size = 2.0, hjust = 0, nudge_x = 0.01, angle = 60) -->
+<!-- # p <- p + coord_cartesian(expand = T) -->
+<!-- # print(p) -->
+
+<!-- spearman.owen.RNA.c1 <- spearman.owen.RNA.c1[order(spearman.owen.RNA.c1, decreasing = T)] -->
+<!-- spearman.owen.RNA.c2 <- spearman.owen.RNA.c2[order(spearman.owen.RNA.c2, decreasing = T)] -->
+
+<!-- head(spearman.owen.RNA.c1, n = 12) -->
+<!-- head(spearman.owen.RNA.c2, n = 12) -->
+
+<!-- # filter for genesets (signatures) that have spearman > 0.7 -->
+<!-- genesets.c1.like <- genesets.de[names(spearman.owen.RNA.c1)[spearman.owen.RNA.c1 > 0.7]] -->
+<!-- genesets.c2.like <- genesets.de[names(spearman.owen.RNA.c2)[spearman.owen.RNA.c2 > 0.7]] -->
+
+<!-- ``` -->
+
+<!-- ## Exoression of Correlated Markersets -->
+
+<!-- Gary mentioned that we want to separately address 'What cell types are we similar to' and 'how do we compare to TCGA?' -->
+<!-- So here we'll just plot 'actual cell types' -->
+
+<!-- ``` {r, dev = 'svg'} -->
+
+<!-- ## Note that here we are using human readable gene set names since these figures will likely go in paper -->
+<!-- # celltypes = known cell types. genesets includes TCGA marker sets (not considered known cell types) -->
+<!-- c1.like.celltypes <- names(genesets.c1.like)[-grep('TCGA', names(genesets.c1.like))] -->
+<!-- hm.gsva.c1.like <- Heatmap(map_2_hr(GSC.gsva[c1.like.celltypes,]), -->
+<!--                             top_annotation = hm_ann, -->
+<!--                             row_names_gp = gpar(fontsize = 10), -->
+<!--                             show_column_names = F, -->
+<!--                             name = 'Pathway Activity', -->
+<!--                             col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red'))) -->
+<!-- draw(hm.gsva.c1.like) -->
+
+<!-- hm.ssgsea.c1.like <- Heatmap(map_2_hr(GSC.ssgsea[c1.like.celltypes,]), -->
+<!--                             top_annotation = hm_ann, -->
+<!--                             row_names_gp = gpar(fontsize = 10), -->
+<!--                             show_column_names = F, -->
+<!--                             name = 'ssgsea', -->
+<!--                             col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red'))) -->
+<!-- draw(hm.ssgsea.c1.like) -->
+
+<!-- c2.like.celltypes <- names(genesets.c2.like)[-grep('TCGA', names(genesets.c2.like))] -->
+<!-- hm.gsva.c2.like <- Heatmap(map_2_hr(GSC.gsva[c2.like.celltypes,]), -->
+<!--                             top_annotation = hm_ann, -->
+<!--                             row_names_gp = gpar(fontsize = 10), -->
+<!--                             show_column_names = F, -->
+<!--                             name = 'Pathway Activity', -->
+<!--                             col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red'))) -->
+<!-- draw(hm.gsva.c2.like) -->
+
+<!-- hm.ssgsea.c2.like <- Heatmap(map_2_hr(GSC.ssgsea[c2.like.celltypes,]), -->
+<!--                             top_annotation = hm_ann, -->
+<!--                             row_names_gp = gpar(fontsize = 10), -->
+<!--                             show_column_names = F, -->
+<!--                             name = 'ssgsea', -->
+<!--                             col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red'))) -->
+<!-- draw(hm.ssgsea.c2.like) -->
+
+<!-- ``` -->
+
+<!-- Make tables of correlation of genesets with our cluster markers as well as overlapping genes. Note that p value for overlap corresponds to a fisher's exact test assessing overlap between the geneset of interest and the cluster markerset it is correlated with -->
+<!-- ``` {r} -->
+<!-- ovr.c1.celltypes <- overlapping.genes[c1.like.celltypes, c1.like.celltypes] -->
+<!-- # get -log10 p-value for fisher's exact test, then transform to p-value -->
+<!-- fisher.c1.celltypes <- log10.fisher.pval[c1.like.celltypes, c1.like.celltypes] -->
+<!-- fisher.c1.celltypes <- 10^(-fisher.c1.celltypes) -->
+<!-- c1.celltype.table <- data.frame(gs.size = as.numeric(lapply(genesets.c1.like[c1.like.celltypes], FUN = length)), -->
+<!--                                 overlap.w.c1 = ovr.c1.celltypes[,'RNA.GSC.c1'], -->
+<!--                                 overlap.pval = fisher.c1.celltypes[, 'RNA.GSC.c1'], -->
+<!--                                 spearman.cor = spearman.owen.RNA.c1[c1.like.celltypes]) -->
+<!-- c1.celltype.table <- map_2_hr(c1.celltype.table) -->
+<!-- c1.celltype.table -->
+<!-- write.csv(c1.celltype.table, file = file.path(analysis.results.dir, 'c1_like_celltypes_signature_comparison.csv')) -->
+
+<!-- ovr.c2.celltypes <- SummExpDR::calc_overlap(genesets.c2.like[c2.like.celltypes]) -->
+<!-- # calculate -log10 p-value for fisher's exact test, then transform to p-value -->
+<!-- fisher.c2.celltypes <- SummExpDR::calc_overlap(genesets.c2.like[c2.like.celltypes], master_set = SU2C.all.RNA.genes, metric = 'fisher.p') -->
+<!-- fisher.c2.celltypes <- 10^(-fisher.c2.celltypes) -->
+<!-- c2.celltype.table <- data.frame(gs.size = as.numeric(lapply(genesets.c2.like[c2.like.celltypes], FUN = length)), -->
+<!--                                 overlap.w.c2 = ovr.c2.celltypes[,'RNA.GSC.c2'], -->
+<!--                                 overlap.pval = fisher.c2.celltypes[, 'RNA.GSC.c2'], -->
+<!--                                 spearman.cor = spearman.owen.RNA.c2[c2.like.celltypes]) -->
+<!-- c2.celltype.table <- map_2_hr(c2.celltype.table) -->
+<!-- c2.celltype.table -->
+<!-- write.csv(c2.celltype.table, file = file.path(analysis.results.dir, 'c2_like_celltypes_signature_comparison.csv')) -->
+
+
+<!-- ``` -->
+
+
+<!-- ## Get Pathways Associated with C1 and C2 like Gene Sets using gprofiler. Determine overlap at pathway level and gene level -->
+
+<!-- Run gprofiler -->
+
+<!-- ``` {r, results='hide'} -->
+<!-- # pathways for gprofiler. we'll filter out any pathways obtained by calling the gprofiler API that aren't in -->
+<!-- # the gmt here. this is so that we can easily make enrichment maps later -->
+<!-- capt.out <- capture.output(gprofiler.pathways <- GSA::GSA.read.gmt('~/projects/su2c_v2/data/raw/gmt_files/gprofiler/hsapiens.GO:BP.name.gmt')) -->
+<!-- rm(capt.out) -->
+<!-- ``` -->
+
+<!-- ``` {r} -->
+<!-- # function to remove GO ids not present in gmt provided by gprofiler website -->
+<!-- remove.GO.ids <- function(gprofiler.result.list) { -->
+<!--   for (i in names(gprofiler.result.list)) { -->
+<!--     table.i <- gprofiler.result.list[[i]] -->
+<!--     items.remove <- which(!(table.i$term.id %in% gprofiler.pathways$geneset.names)) -->
+<!--     if (length(items.remove) > 0) { -->
+<!--       warning(paste('removing ', length(items.remove), 'GO IDs from gprofiler results for geneset', i, ':', -->
+<!--                     paste(table.i$term.id[items.remove], collapse = ';'))) -->
+<!--       table.i <- table.i[-items.remove,] -->
+<!--     } -->
+<!--     gprofiler.result.list[[i]] <- table.i -->
+<!--   } -->
+<!--   return(gprofiler.result.list) -->
+<!-- } -->
+
+<!-- c1.like.gprofiler <- lapply(genesets.c1.like, FUN = function(x) { -->
+<!--   result <- gprofiler(query = x, organism = 'hsapiens', sort_by_structure = F, -->
+<!--                       ordered_query = F, significant = T, exclude_iea = T, max_p_value = 0.05, -->
+<!--                       src_filter = 'GO:BP', custom_bg = SU2C.all.RNA.genes, correction_method = 'fdr', -->
+<!--                       min_set_size = 15, max_set_size = 200) -->
+<!--   return(result[,c('term.id', 'term.name', 'p.value')]) -->
+<!-- }) -->
+<!-- c1.like.gprofiler <- remove.GO.ids(c1.like.gprofiler) -->
+
+<!-- c2.like.gprofiler <- lapply(genesets.c2.like, FUN = function(x) { -->
+<!--   result <- gprofiler(query = x, organism = 'hsapiens', sort_by_structure = F, -->
+<!--                       ordered_query = F, significant = T, exclude_iea = T, max_p_value = 0.05, -->
+<!--                       src_filter = 'GO:BP', custom_bg = SU2C.all.RNA.genes, correction_method = 'fdr', -->
+<!--                       min_set_size = 15, max_set_size = 200) -->
+<!--   return(result[,c('term.id', 'term.name', 'p.value')]) -->
+<!-- }) -->
+
+<!-- c2.like.gprofiler <- remove.GO.ids(c2.like.gprofiler) -->
+
+<!-- get_terms <- function(gprofiler.list) { -->
+<!--   lapply(gprofiler.list, FUN = function(x) { -->
+<!--     return(x$term.id) -->
+<!--   }) } -->
+
+<!-- term.ids.c1.like <- get_terms(c1.like.gprofiler) -->
+<!-- term.ids.c2.like <- get_terms(c2.like.gprofiler) -->
+
+<!-- ``` -->
+
+<!-- ### Overlapping Pathways + Genes, C1 + C1 like genesets -->
+
+<!-- Find overlapping pathways between c1 and similar genesets, and also pathway differences. save results -->
+
+<!-- ``` {r dev='svg'} -->
+
+
+<!-- ## function to make heatmap with numbers -->
+<!-- hm_w_numbers <- function(ovr.mat, value.name, order.samples) { -->
+<!--   ovr.mat <- ovr.mat[order.samples, order.samples] -->
+<!--   mat.melt <- melt(ovr.mat, value.name = value.name) -->
+<!--   p <- ggplot(data = mat.melt, aes_(x=as.name('Var1'), y=as.name('Var2'), fill=as.name(value.name))) -->
+<!--    p <- p + -->
+<!--       theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10), -->
+<!--             axis.text.y = element_text(angle = 0, hjust = 1, size = 10)) + -->
+<!--       geom_tile() + scale_fill_gradient2(low = 'darkturquoise', mid = 'white', high = 'red') + -->
+<!--       geom_text(aes_(label = round(mat.melt[,value.name], 2)), size = 3.0) -->
+<!--   return(p) -->
+<!-- } -->
+<!-- ## draw heatmaps for pathway overlap (overlap coefficient overlapping pathways, jaccard index),  -->
+<!-- ## save matrices to file -->
+<!-- for (metric in c('ovr.coef', 'num.ovr', 'jaccard')) { -->
+<!--   c1.like.pathway.ovr <- SummExpDR::calc_overlap(list1 = term.ids.c1.like, metric = metric) -->
+<!--   c1.like.gene.ovr <- SummExpDR::calc_overlap(list1 = genesets.c1.like, metric = metric) -->
+<!--   if (metric == 'ovr.coef') { -->
+<!--     clust.order <- hclust(as.dist(1-c1.like.gene.ovr))$order -->
+<!--   } -->
+<!--   p <- hm_w_numbers(c1.like.gene.ovr, metric, clust.order) -->
+<!--   p <- p + ggtitle('Genes') -->
+<!--   print(p) -->
+<!--   rm(p) -->
+<!--   p <- hm_w_numbers(c1.like.pathway.ovr, metric, clust.order) -->
+<!--   p <- p + ggtitle('Pathways') -->
+<!--   print(p) -->
+<!--   rm(p) -->
+
+<!-- } -->
+
+<!-- for (i in 1:length(c1.like.gprofiler)) { -->
+<!--   pathway.name.gs.i <- names(c1.like.gprofiler)[i] -->
+
+<!--   gs.i.pathways <- c1.like.gprofiler[[i]] -->
+<!--   ## save results to file -->
+<!--   write.table(gs.i.pathways, -->
+<!--               file = file.path(analysis.results.dir, paste0(pathway.name.gs.i, '_all_pathways.tsv')),  -->
+<!--               sep = '\t', quote = F, row.names = F) -->
+
+<!--   if (i > 1) { -->
+<!--     ## get common pathways between c1 and given geneset, -->
+<!--     ## as well as c1 unique pathways and geneset specific pathways -->
+<!--     comparison <- paste0('RNA_c1_vs_', pathway.name.gs.i) -->
+<!--     common.pathways <- intersect(gs.i.pathways$term.name, c1.like.gprofiler$RNA.GSC.c1$term.name) -->
+<!--     c1.diff.pathways <- setdiff(c1.like.gprofiler$RNA.GSC.c1$term.name, gs.i.pathways$term.name) -->
+<!--     gs.i.diff.pathways <- setdiff(gs.i.pathways$term.name, c1.like.gprofiler$RNA.GSC.c1$term.name) -->
+<!--     ## save results -->
+<!--     write.table(c1.like.gprofiler$RNA.GSC.c1[which(c1.like.gprofiler$RNA.GSC.c1$term.name %in% common.pathways), ], -->
+<!--               file = file.path(analysis.results.dir, paste0(comparison, '_common_pathways.tsv')), sep = '\t', -->
+<!--               quote = F, row.names = F) -->
+<!--     write.table(c1.like.gprofiler$RNA.GSC.c1[which(c1.like.gprofiler$RNA.GSC.c1$term.name %in% c1.diff.pathways),], -->
+<!--               file = file.path(analysis.results.dir, paste0(comparison, '_c1_specific_pathways.tsv')), sep = '\t', -->
+<!--               quote = F, row.names = F) -->
+<!--     write.table(gs.i.pathways[which(gs.i.pathways$term.name %in% gs.i.diff.pathways),], -->
+<!--               file = file.path(analysis.results.dir, paste0(comparison, '_', pathway.name.gs.i, '_specific_pathways.tsv')),  -->
+<!--               sep = '\t', quote = F, row.names = F) -->
+<!--   } -->
+
+<!-- } -->
+
+<!-- ``` -->
+
+
+<!-- ### Overlapping Pathways, C2 + C2 like genesets -->
+
+<!-- Do same for cluster 2 -->
+
+<!-- ```{r} -->
+
+<!-- ## draw heatmaps for pathway overlap (overlap coefficient overlapping pathways, jaccard index),  -->
+<!-- ## save matrices to file -->
+<!-- for (metric in c('ovr.coef', 'num.ovr', 'jaccard')) { -->
+<!--   c2.like.pathway.ovr <- SummExpDR::calc_overlap(list1 = term.ids.c2.like, metric = metric) -->
+<!--   c2.like.gene.ovr <- SummExpDR::calc_overlap(list1 = genesets.c2.like, metric = metric) -->
+<!--   if (metric == 'ovr.coef') { -->
+<!--     clust.order <- hclust(as.dist(1-c2.like.gene.ovr))$order -->
+<!--   } -->
+<!--   p <- hm_w_numbers(c2.like.gene.ovr, metric, clust.order) -->
+<!--   p <- p + ggtitle('Genes') -->
+<!--   print(p) -->
+<!--   rm(p) -->
+<!--   p <- hm_w_numbers(c2.like.pathway.ovr, metric, clust.order) -->
+<!--   p <- p + ggtitle('Pathways') -->
+<!--   print(p) -->
+<!--   rm(p) -->
+
+<!-- } -->
+
+
+<!-- for (i in 1:length(c2.like.gprofiler)) { -->
+<!--   pathway.name.gs.i <- names(c2.like.gprofiler)[i] -->
+
+<!--   gs.i.pathways <- c2.like.gprofiler[[i]] -->
+<!--   ## save results to file -->
+<!--   write.table(gs.i.pathways, -->
+<!--               file = file.path(analysis.results.dir, paste0(pathway.name.gs.i, '_all_pathways.tsv')),  -->
+<!--               sep = '\t', quote = F, row.names = F) -->
+
+<!--   if (i > 1) { -->
+<!--     ## get common pathways between c2 and given geneset, -->
+<!--     ## as well as c2 unique pathways and geneset specific pathways -->
+<!--     comparison <- paste0('RNA_c2_vs_', pathway.name.gs.i) -->
+<!--     common.pathways <- intersect(gs.i.pathways$term.name, c2.like.gprofiler$RNA.GSC.c2$term.name) -->
+<!--     c2.diff.pathways <- setdiff(c2.like.gprofiler$RNA.GSC.c2$term.name, gs.i.pathways$term.name) -->
+<!--     gs.i.diff.pathways <- setdiff(gs.i.pathways$term.name, c2.like.gprofiler$RNA.GSC.c2$term.name) -->
+<!--     ## save results -->
+<!--     write.table(c2.like.gprofiler$RNA.GSC.c2[which(c2.like.gprofiler$RNA.GSC.c2$term.name %in% common.pathways), ], -->
+<!--               file = file.path(analysis.results.dir, paste0(comparison, '_common_pathways.tsv')), sep = '\t', -->
+<!--               quote = F, row.names = F) -->
+<!--     write.table(c2.like.gprofiler$RNA.GSC.c2[which(c2.like.gprofiler$RNA.GSC.c2$term.name %in% c2.diff.pathways),], -->
+<!--               file = file.path(analysis.results.dir, paste0(comparison, '_c2_specific_pathways.tsv')), sep = '\t', -->
+<!--               quote = F, row.names = F) -->
+<!--     write.table(gs.i.pathways[which(gs.i.pathways$term.name %in% gs.i.diff.pathways),], -->
+<!--               file = file.path(analysis.results.dir, paste0(comparison, '_', pathway.name.gs.i, '_specific_pathways.tsv')),  -->
+<!--               sep = '\t', quote = F, row.names = F) -->
+<!--   } -->
+
+<!-- } -->
+
+<!-- ## copy pathway gmt file to output directory for easy access for cytoscape -->
+<!-- system(paste('cp ~/projects/su2c_v2/data/raw/gmt_files/gprofiler/hsapiens.GO:BP.name.gmt -t', -->
+<!--              analysis.results.dir)) -->
+
+
+<!-- ``` -->
+
+
+<!-- ## TCGA Classification -->
+
+<!-- For Patty Sachamitr at Dirks Lab, we're going to get ssgsea and GSVA scores for the TCGA samples -->
+<!-- only and 'classify cells' as Proneural, Mesenchymal, or Classical -->
+
+<!-- ### ssGSEA -->
+
+<!-- ``` {r dev ='svg'} -->
+<!-- hm.ssgsea.TCGA.c1 <- Heatmap(map_2_hr(GSC.ssgsea[grep('TCGA_PN|RNA.GSC.c1', rownames(GSC.ssgsea)), ]),  -->
+<!--                            column_names_gp = gpar(fontsize = 4), -->
+<!--                             row_names_gp = gpar(fontsize = 10), -->
+<!--                             top_annotation = hm_ann, -->
+<!--                             col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red')), -->
+<!--                             name = 'ssgsea') -->
+<!-- draw(hm.ssgsea.TCGA.c1) -->
+
+<!-- hm.ssgsea.TCGA.c2 <- Heatmap(map_2_hr(GSC.ssgsea[grep('TCGA_MES|RNA.GSC.c2', rownames(GSC.ssgsea)), ]),  -->
+<!--                            column_names_gp = gpar(fontsize = 4), -->
+<!--                           row_names_gp = gpar(fontsize = 10), -->
+<!--                           top_annotation = hm_ann, -->
+<!--                           col = circlize::colorRamp2(breaks = c(-1, 0, 1),  -->
+<!--                                                      colors = c ('blue', 'white', 'red')), -->
+<!--                           name = 'ssgsea') -->
+<!-- draw(hm.ssgsea.TCGA.c2) -->
+<!-- ``` -->
+
+<!-- If we try classifying based on max ssgsea score, we get swamped with 'classical' classified -->
+<!-- samples since scores for classical are generally higher than for other types. recall that -->
+<!-- ssgsea essentially calculates a GSEA enrichment score with the cells' ranked gene expression -->
+<!-- provided as the ranked genelist -->
+
+<!-- ``` {r} -->
+<!-- GSC.ssgsea.TCGA <- GSC.ssgsea[grep('TCGA', rownames(GSC.ssgsea)), ] -->
+
+<!-- TCGA.classifications <- apply(GSC.ssgsea.TCGA, MARGIN = 2,  FUN = function(x) { -->
+<!--   return(rownames(GSC.ssgsea.TCGA)[which(x == max(x))]) -->
+<!-- }) -->
+<!-- table(TCGA.classifications) -->
+<!-- TCGA.class.table <- data.frame(t(GSC.ssgsea.TCGA)) -->
+<!-- TCGA.class.table[names(TCGA.classifications), 'classification'] <- TCGA.classifications -->
+<!-- write.csv(TCGA.class.table, file = file.path(analysis.results.dir, 'TCGA_classes_ssgsea.csv')) -->
+<!-- TCGA.class.table -->
+<!-- rm(TCGA.class.table) -->
+<!-- ``` -->
+
+<!-- ### GSVA -->
+
+<!-- ``` {r dev='svg'} -->
+<!-- hm.mat.TCGA.c1 <- map_2_hr(GSC.gsva[grep('TCGA_PN|RNA.GSC.c1', rownames(GSC.gsva)), ]) -->
+<!-- hm.mat.TCGA.c1 <- hm.mat.TCGA.c1[order(rownames(hm.mat.TCGA.c1)),] -->
+<!-- hm.gsva.TCGA.c1 <- Heatmap(map_2_hr(GSC.gsva[grep('TCGA_PN|RNA.GSC.c1', rownames(GSC.gsva)), ]),  -->
+<!--                            column_names_gp = gpar(fontsize = 4), -->
+<!--                             row_names_gp = gpar(fontsize = 15), -->
+<!--                             cluster_rows = F, -->
+<!--                             top_annotation = hm_ann, -->
+<!--                             col = circlize::colorRamp2(breaks = c(-1, 0, 1), colors = c ('blue', 'white', 'red')), -->
+<!--                             name = 'Pathway Activity') -->
+<!-- draw(hm.gsva.TCGA.c1) -->
+<!-- hm.mat.TCGA.c2 <- map_2_hr(GSC.gsva[grep('TCGA_MES|RNA.GSC.c2', rownames(GSC.gsva)), ]) -->
+<!-- hm.mat.TCGA.c2 <- hm.mat.TCGA.c2[order(rownames(hm.mat.TCGA.c2)), ] -->
+<!-- hm.gsva.TCGA.c2 <- Heatmap(hm.mat.TCGA.c2,  -->
+<!--                            column_names_gp = gpar(fontsize = 4), -->
+<!--                           row_names_gp = gpar(fontsize = 15), -->
+<!--                           top_annotation = hm_ann, -->
+<!--                           col = circlize::colorRamp2(breaks = c(-1, 0, 1),  -->
+<!--                                                      colors = c ('blue', 'white', 'red')), -->
+<!--                           name = 'Pathway Activity') -->
+<!-- draw(hm.gsva.TCGA.c2) -->
+<!-- ``` -->
+
+<!-- We'll classify based on maximum GSVA score since it emphasizes relative expression between samples. -->
+
+<!-- ``` {r} -->
+<!-- GSC.gsva.TCGA <- GSC.gsva[grep('TCGA', rownames(GSC.gsva)), ] -->
+
+<!-- TCGA.classifications <- apply(GSC.gsva.TCGA, MARGIN = 2,  FUN = function(x) { -->
+<!--   return(rownames(GSC.gsva.TCGA)[which(x == max(x))]) -->
+<!-- }) -->
+<!-- table(TCGA.classifications) -->
+<!-- TCGA.class.table <- data.frame(t(GSC.gsva.TCGA)) -->
+<!-- TCGA.class.table[names(TCGA.classifications), 'classification'] <- TCGA.classifications -->
+<!-- write.csv(TCGA.class.table, file = file.path(analysis.results.dir, 'TCGA_classes_GSVA.csv')) -->
+<!-- TCGA.class.table -->
+<!-- ``` -->
+
+<!-- Only a subset of these are in the PRTM5i story, so save results for these ones -->
+
+<!-- ``` {r} -->
+<!-- prtm5i.metadata.dir <- '~/projects/su2c_v2/data/preprocessed/metadata/prtm5i_samples' -->
+<!-- prtm5i.sample.meta <- read_xlsx(file.path(prtm5i.metadata.dir, 'List_of_cell_lines_in_PRMT5_MS.xlsx')) -->
+<!-- head(prtm5i.sample.meta) -->
+
+<!-- prtm5i.sample.meta$Lines <- paste0(prtm5i.sample.meta$Lines , '_L') -->
+
+<!-- TCGA.classes.prtm5i.samples <- TCGA.class.table[intersect(prtm5i.sample.meta$Lines, -->
+<!--                                                           rownames(TCGA.class.table)), ] -->
+<!-- ## 46 samples. add NA entries for samples not present -->
+<!-- dim(TCGA.classes.prtm5i.samples) -->
+<!-- setdiff(prtm5i.sample.meta$Lines, rownames(TCGA.class.table)) -->
+
+<!-- df.add <- data.frame(TCGA_PN = rep(NA, 3), TCGA_NL = rep(NA, 3), TCGA_CL = rep(NA, 3),  -->
+<!--                      TCGA_MES = rep(NA, 3), classification = rep(NA, 3),  -->
+<!--                      row.names = setdiff(prtm5i.sample.meta$Lines, rownames(TCGA.class.table))) -->
+<!-- TCGA.classes.prtm5i.samples <- rbind(TCGA.classes.prtm5i.samples, df.add) -->
+<!-- TCGA.classes.prtm5i.samples <- TCGA.classes.prtm5i.samples[prtm5i.sample.meta$Lines,] -->
+
+<!-- TCGA.classes.prtm5i.samples -->
+<!-- write.csv(TCGA.classes.prtm5i.samples, file = file.path(analysis.results.dir, 'TCGA_classes_GSVA_prtm5i_samples.csv')) -->
+
+<!-- ``` -->
+
+
+<!-- Get number of overlapping genes. Note that this only includes genes that are in ENSEMBL verion 95's -->
+<!-- mappings for HGNC symbols. Also make two tables denoting overlap and correlation of the TCGA marker sets with our cluster 1 and cluster 2 marker sets. -->
+
+<!-- ``` {r} -->
+<!-- tcga.RNA.GSC.names <- names(genesets)[grep('TCGA|RNA.GSC', names(genesets))] -->
+<!-- TCGA.ovr <- overlapping.genes[tcga.RNA.GSC.names, tcga.RNA.GSC.names] -->
+<!-- # calculate -log10 pvals for fisher's exact test -->
+<!-- TCGA.ovr.pval <- 10^-(log10.fisher.pval[tcga.RNA.GSC.names, tcga.RNA.GSC.names]) -->
+<!-- TCGA.gs.size <- as.numeric(lapply(genesets[tcga.RNA.GSC.names], length)) -->
+<!-- TCGA.ovr -->
+<!-- TCGA.ovr.pval -->
+
+<!-- TCGA.correlation <- correlation.gsva[tcga.RNA.GSC.names, -->
+<!--                                     grep('RNA.GSC', rownames(correlation.gsva))] -->
+<!-- TCGA.correlation -->
+
+<!-- # columns: overlap = number of overlapping genes between geneset + cluster 1 markers -->
+<!-- #         gs.size = geneset size   -->
+<!-- #         ovr.pval = fisher's exact test for overlap denoted in overlap column -->
+<!-- #         spearman.cor = spearman correlation of gsva score between given marker set and cluster -->
+<!-- #         1 markers -->
+<!-- TCGA.v.c1.df <- data.frame(overlap = TCGA.ovr[,'RNA.GSC.c1'],  -->
+<!--                            gs.size = TCGA.gs.size,  -->
+<!--                            ovr.pval = TCGA.ovr.pval[,'RNA.GSC.c1'],  -->
+<!--                            spearman.cor = TCGA.correlation[,'RNA.GSC.c1']) -->
+<!-- TCGA.v.c1.df <- map_2_hr(TCGA.v.c1.df[-grep('c2', rownames(TCGA.v.c1.df)),]) -->
+<!-- TCGA.v.c1.df -->
+<!-- write.csv(TCGA.v.c1.df, file = file.path(analysis.results.dir, 'TCGA_vs_c1_overlap_and_correlation.csv')) -->
+
+<!-- # columns are same as before, but for overlap and correslation with cluster 2 markers -->
+<!-- TCGA.v.c2.df <- data.frame(overlap = TCGA.ovr[,'RNA.GSC.c2'],  -->
+<!--                            gs.size = TCGA.gs.size,  -->
+<!--                            ovr.pval = TCGA.ovr.pval[,'RNA.GSC.c2'],  -->
+<!--                            spearman.cor = TCGA.correlation[,'RNA.GSC.c2']) -->
+<!-- TCGA.v.c2.df <- map_2_hr(TCGA.v.c2.df[-grep('c1', rownames(TCGA.v.c2.df)),]) -->
+<!-- TCGA.v.c2.df -->
+<!-- write.csv(TCGA.v.c2.df, file = file.path(analysis.results.dir, 'TCGA_vs_c2_overlap_and_correlation.csv')) -->
+
+<!-- ``` -->
+
+__Session Info__
+
+```{r}
+Sys.time()
+sessionInfo()
+```

@@ -1,0 +1,95 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+    toc: true
+    toc_depth: 6
+params:
+  inp_data: '/home/owenwhitley/projects/su2c_v2/data/preprocessed/scRNA/GSCs_Tumour_combined/laura_BTSC_Tumour_combined_Oct_2019_no_G800_L.rds'
+  feats_plot: 'GFAP'
+  split_by: 'seurat_clusters'
+  color_by: 'NULL'
+  filter_by: 'NULL'
+  filter_class: '1'
+  xlab_size: 15
+  comparisons: 'all'
+---
+
+
+```{r, error=TRUE, fig.width=10, fig.height=6}
+
+library(Matrix)
+library(Seurat)
+library(ggplot2)
+library(SummarizedExperiment)
+library(R.devices)
+
+source('./laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+
+# preproc_dir <- '~/projects/su2c_v2/data/preprocessed/scRNA/GSCs_Tumour_combined'
+# data_fname <- 'BTSC_Tumour_combined_obj.RData'
+
+# results_dir <- '~/projects/su2c_v2/results/scRNA/GSCs_Tumour_combined'
+# results_file <- 'BTSC_Tumour_combined_id_mixed.RData'
+# results_file <- 'diff_exp_pathway_analysis_results.RData'
+# rerun_diff_exp <- TRUE
+
+# tryCatch({load(file.path(preproc_dir, data_fname))},
+#          error = function(e) {
+#            stop('error in loading preprocessed data. try running laura_SU2C_GBM_GSCs_combined_preprocess.R first')
+#            })
+
+for (i in 1:length(params)) {
+  param.i <- names(params)[i]
+  assign(param.i, params[[i]])
+  if (is.character(get(param.i))) {
+    if (length(get(param.i)) == 1) {
+      if (get(param.i) == 'NULL') {
+        assign(param.i, NULL)
+      }
+    }
+  }
+}
+
+if (is.character(inp_data)) {
+      # we only load data in from file for testing/debugging purposes.
+      # inp_data should generally be a Seurat object that is fully preprocessed 
+      # as outlined in 'seurat_pipeline' function in helper functions,
+      # with PCA calculated
+      if (file.exists(inp_data)) {
+        inp_data <- readRDS(inp_data)
+      } else {
+        stop(paste('file', inp_data, 'does not exist'))
+      }
+}
+# feats_plot cannot be of length 1
+if (length(feats_plot) < 2) {
+  feats_plot <- union(feats_plot, colnames(inp_data@meta.data)[1:3])
+}
+# remove any features not in Seurat object, also filter for only numeric features
+meta_data <- as.data.frame(FetchData(inp_data, vars.all = c(feats_plot)))
+feats_plot <- feats_plot[feats_plot %in% colnames(meta_data)]
+numeric_feats <- which(as.logical(lapply(meta_data, FUN = function(x) {is.numeric(x)})))
+if (!length(numeric_feats) == ncol(meta_data)) {
+  print(paste('keeping', length(numeric_feats), 'numeric features of', ncol(meta_data), 'features for plotting'))
+}
+feats_plot <- feats_plot[numeric_feats]
+feats_plot <- feats_plot[order(feats_plot)]
+
+for (feat in feats_plot) {
+  try({
+    p <- sc_jitter_plot(seurat_obj = inp_data, split_by = split_by, y_axis = feat,
+                      size = 0.1, color_by = color_by, mode = 'boxplot', filter_by = filter_by, filter_class = filter_class,
+                      comparisons = comparisons)
+    p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1, size = xlab_size))
+    print(p)
+  })
+}
+
+```
+
+
+``` {r}
+sessionInfo()
+```

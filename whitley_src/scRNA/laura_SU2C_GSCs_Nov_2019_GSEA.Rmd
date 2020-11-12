@@ -1,0 +1,70 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+
+```{r}
+
+library(Seurat)
+library(SummarizedExperiment)
+library(SummExpDR)
+
+top.dir <- '~/projects/su2c_v2'
+master_output_dir <- file.path(top.dir, '/results/scRNA')
+overwrite.output <- TRUE
+output_dir <- file.path(master_output_dir, 'laura_GSCs_no_G800_L_Nov_2019_GSEA')
+output_dir <- paste0(output_dir, '_', gsub('(-| |:)', '_', Sys.time()))
+if (overwrite.output) {
+  system(paste('rm -rf', output_dir))
+}
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+## load scRNA data
+data_dir <- '../../data/raw/scRNA/Data/GSCs_G800Removed_Nov2019'
+data_file <- 'BTSC_G800L_removed_AUCell_SeuratObj.rds'
+BTSC <- readRDS(file.path(data_dir, data_file))
+
+```
+
+## Run GSEA on PC1
+
+``` {r}
+## write files and run GSEA
+
+# pathways file to be used for GSEA. from http://download.baderlab.org/EM_Genesets/
+gsea_gmt_file <- '../../data/raw/gmt_files/baderlab_gmts/Human_GO_AllPathways_no_GO_iea_April_01_2018_symbol.gmt'
+
+# get loadings
+PC_loadings <- Seurat::GetGeneLoadings(BTSC, reduction.type = 'pca', dims.use = 1)
+rm(BTSC)
+gc(full = TRUE)
+# note that since Injury Response program appears to be positively associated with PC1, and we want the 'positive' enrichments
+# to be Developmental, we take the negative of the PC loadings. This is entirely valid as we will still be looking at the same signal
+# of association with PC1, just in reverse order
+PC_1_loadings_rev <- data.frame(genes = rownames(PC_loadings), loadings = -PC_loadings[,paste0('PC', 1)])
+PC_1_loadings_rev <- PC_1_loadings_rev[order(PC_1_loadings_rev$loadings, decreasing = TRUE), ]
+rnk_fpath <- file.path(output_dir, paste0('PC', 1, '_rev_loadings.rnk'))
+write.table(PC_1_loadings_rev, file = rnk_fpath, sep = '\t', col.names = FALSE, row.names = FALSE, quote = FALSE)
+
+SummExpDR::enrich_GSEA(gsea_rank_list_path = rnk_fpath, 
+                      gsea_analysis_name = paste0('PC', 1, '_loadings_rev'),
+                      gsea_rpt_label = 'report',
+                      gsea_out = output_dir,
+                      gsea_gmx = gsea_gmt_file,
+                      gsea_min_gs_size = 15, gsea_max_gs_size = 200)
+
+
+
+```
+
+
+## Session Info
+``` {r}
+Sys.time()
+sessionInfo()
+```

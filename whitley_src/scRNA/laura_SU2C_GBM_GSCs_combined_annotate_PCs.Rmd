@@ -1,0 +1,270 @@
+---
+title: "Annotate Principal Components, laura_SU2C_GBM_GSCs_combined analysis"
+output:
+  html_document:
+    df_print: 
+    toc: true
+params:
+  inp_file: '../../data/preprocessed/scRNA/GSCs_Tumour_combined/laura_BTSC_Tumour_combined_Oct_2019_no_G800_L.rds'
+  output_dir: '../../results/scRNA/laura_SU2C_GBM_GSCs_combined_Oct_2019_no_G800_L_misc'
+---
+
+``` {r}
+library(corrplot)
+library(ComplexHeatmap)
+# library(pheatmap)
+source('./laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+# output_dir <- '../../results/scRNA/laura_SU2C_GBM_GSCs_combined_misc_tasks'
+
+for (i in 1:length(params)) {
+  param.i <- names(params)[i]
+  assign(param.i, params[[i]])
+  if (is.character(get(param.i))) {
+    if (length(get(param.i)) == 1) {
+      if (get(param.i) == 'NULL') {
+        assign(param.i, NULL)
+      }
+    }
+  }
+}
+output_dir <- paste0(output_dir, '/')
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+```
+
+## Explore PCs + Association w/samples
+
+``` {r}
+# fname <- '../../data/preprocessed/scRNA/GSCs_Tumour_combined/laura_BTSC_Tumour_combined_Oct_2019.rds'
+fname <- 
+BTSC_Tumour_combined_obj <- readRDS(inp_file)
+# BTSC_Tumour_combined_obj <- subset_seurat(BTSC_Tumour_combined_obj)
+# manually remove slots that use a lot of memory
+BTSC_Tumour_combined_obj@raw.data <- NULL
+gc(full = TRUE)
+
+Seurat::PCElbowPlot(BTSC_Tumour_combined_obj, num.pc = 50)
+
+# BTSC_Tumour_combined_obj <- subset_seurat(BTSC_Tumour_combined_obj)
+# gc(full = TRUE)
+
+fetched_data <- Seurat::FetchData(BTSC_Tumour_combined_obj, vars.all = c(paste0('PC', 1:10), 'SampleID'))
+
+for (i in 1:4) {
+  p <- sc_jitter_plot(BTSC_Tumour_combined_obj, split_by = 'SampleID', color_by = 'SampleID', y_axis = paste0('PC', i),
+                      mode = 'boxplot')
+  p <- p + theme(axis.text.x = element_text(angle = 90, hjust = 1))
+  print(p)
+}
+
+```
+
+### culture condition
+
+``` {r}
+for (i in 1:4) {
+  p <- single_dr_plot(BTSC_Tumour_combined_obj, dim1 = i, dim2 = i + 1, reduction.use = 'pca', feat = 'culture_cond',
+                      legend_pt_size = 2.0)
+  print(p)
+}
+```
+
+### sampleID
+
+``` {r}
+for (i in 1:4) {
+  p <- single_dr_plot(BTSC_Tumour_combined_obj, dim1 = i, dim2 = i + 1, reduction.use = 'pca', feat = 'SampleID',
+                      legend_pt_size = 2.0)
+  print(p)
+}
+```
+
+### astrocyte
+
+``` {r}
+for (i in 1:4) {
+  p <- single_dr_plot(BTSC_Tumour_combined_obj, dim1 = i, dim2 = i + 1, 
+                      reduction.use = 'pca', feat = 'cahoy_astrocyte_AUC',
+                      legend_pt_size = 2.0)
+  print(p)
+}
+```
+
+### glioma stem cell
+
+``` {r}
+for (i in 1:4) {
+  p <- single_dr_plot(BTSC_Tumour_combined_obj, dim1 = i, dim2 = i + 1, 
+                      reduction.use = 'pca', feat = 'glioma.stem.cell_AUC',
+                      legend_pt_size = 2.0)
+  print(p)
+}
+```
+
+### Neuron
+
+``` {r}
+for (i in 1:4) {
+  p <- single_dr_plot(BTSC_Tumour_combined_obj, dim1 = i, dim2 = i + 1, 
+                      reduction.use = 'pca', feat = 'cahoy_neuron_AUC',
+                      legend_pt_size = 2.0)
+  print(p)
+}
+```
+
+### c1/c2
+
+``` {r}
+for (i in 1:4) {
+  p <- single_dr_plot(BTSC_Tumour_combined_obj, dim1 = i, dim2 = i + 1, reduction.use = 'pca', feat = 'C1_C2_diff',
+                      legend_pt_size = 2.0)
+  print(p)
+}
+```
+
+### other feats
+
+``` {r}
+metadata_names <- colnames(BTSC_Tumour_combined_obj@meta.data)
+score_names <- metadata_names[grep('Neftel|Suva', metadata_names)]
+for (feat in score_names) {
+  for (i in 1:4) {
+    p <- single_dr_plot(BTSC_Tumour_combined_obj, dim1 = i, dim2 = i + 1, 
+                        reduction.use = 'pca', feat = feat,
+                        legend_pt_size = 2.0)
+    print(p)
+  }
+}
+rm(score_names)
+```
+
+# quantify association of each PC with all AUC or cell cycle scores
+
+``` {r, dev='svg'}
+metadata_names <- colnames(BTSC_Tumour_combined_obj@meta.data)
+score_names <- metadata_names[grep('Score|VERHAAK|RNA.GSC.c[1-2]|cahoy|Neftel|Suva|nowakowski', metadata_names)]
+# number of scores used
+length(score_names)
+# names of scores_used
+score_names[order(score_names)]
+
+fetched_data <- Seurat::FetchData(BTSC_Tumour_combined_obj, vars.all = c(paste0('PC', 1:20), score_names))
+cor_mat <- cor(fetched_data, method = 'spearman')
+corr_hclust <- hclust(as.dist(1-cor_mat), method = 'complete')
+cor_mat <- cor_mat[corr_hclust$order, corr_hclust$order]
+# corrplot::corrplot(cor_mat, tl.cex = 0.5)
+
+# svg(file.path(output_dir, 'score_corrmat.svg'))
+# corrplot::corrplot(cor_mat, tl.cex = 0.2)
+# dev.off()
+
+```
+
+``` {r, fig.path=eval(output_dir), dev='svg'}
+
+corrplot::corrplot(cor_mat, tl.cex = 0.2)
+
+# get absolute value of correlation of PCs with scores
+PC_cor_list <- as.data.frame(abs(cor_mat[score_names,grep('^PC', colnames(cor_mat))]))
+PC_cor_list <- as.list(PC_cor_list)
+PC_cor_list <- PC_cor_list[order(as.integer(sub('PC', '', names(PC_cor_list))))]
+names(PC_cor_list)
+boxplot(PC_cor_list, xlab = 'PC', ylab = 'correlation with AUC or other score')
+```
+
+<!-- # quantify association of each PC with pathways -->
+
+<!-- ``` {r} -->
+<!-- # load in pathways from gmt file -->
+<!-- capt_out <- capture.output(pathway_genesets <- -->
+<!--                              GSA.read.gmt('/home/owenwhitley/GSEA/gmts/Human_GOBP_AllPathways_no_GO_iea_December_01_2018_symbol.gmt') -->
+<!--           ) -->
+<!-- rm(capt_out) -->
+<!-- # sanity check on pathways -->
+<!-- any(as.logical(lapply(pathway_genesets$genesets, FUN = function(x) {any(x == '')}))) -->
+<!-- all(as.logical(lapply(pathway_genesets$genesets, FUN = function(x) {any(x == '')}))) -->
+<!-- # there are some empty entries due to a parsing bug. fix for all genesets -->
+<!-- pathway_genesets$genesets <- lapply(pathway_genesets$genesets, FUN = function(x) {return(x[-which(x == '')])}) -->
+<!-- any(as.logical(lapply(pathway_genesets$genesets, FUN = function(x) {any(x == '')}))) -->
+<!-- head(pathway_genesets$genesets[1:5]) -->
+<!-- # filter all genesets first for genese in our 'master geneset' -->
+<!-- valid_genes <- rownames(BTSC_Tumour_combined_obj@data) -->
+<!-- # valid_genes <- sample(valid_genes, replace = FALSE, size = 500) -->
+<!-- pathway_genesets$genesets <- lapply(pathway_genesets$genesets, FUN = function(x) {return(x[x %in% valid_genes])}) -->
+<!-- # then filter by geneset size -->
+<!-- min_size = 15 -->
+<!-- max_size = 200 -->
+<!-- passes_size_thresh <- as.logical(lapply(pathway_genesets$genesets, FUN = function(x) { -->
+<!--   return(length(x) > min_size && length(x) < max_size) -->
+<!-- })) -->
+<!-- pathway_genesets <- lapply(pathway_genesets, FUN = function(x) {return(x[which(passes_size_thresh)])}) -->
+<!-- length(which(passes_size_thresh)) -->
+
+<!-- # Correlate genes with RNA.GSC.c1 signature and RNA.GSC.c2 signature (specifically difference between the 2) -->
+<!-- # see preprocess_GeneSets.Rmd script for more details -->
+
+
+<!-- correlate_var_w_genes <- function(var1, data_mat, method = 'spearman', FDR = 0.10) { -->
+<!--   zero_stdev <- apply(data_mat, MARGIN = 2, stats::sd) == 0 -->
+<!--   if (any(zero_stdev)) { -->
+<!--     warning(paste('removing', sum(zero_stdev), 'features with 0 standard deviation')) -->
+<!--   } -->
+<!--   data_mat <- data_mat[,which(!zero_stdev)] -->
+<!--   cor_vals <- apply(data_mat, MARGIN = 2, FUN = function(x) { -->
+<!--     cor_val <- cor(x, var1, method = method) -->
+<!--   }) -->
+<!--   pvals <- apply(data_mat, MARGIN = 2, FUN = function(x) { -->
+<!--     cor_pval <- cor.test(x, var1, method = method)$p.value -->
+<!--   }) -->
+<!--   cor_results <- data.frame(cor = cor_vals, pval = pvals) -->
+<!--   cor_results$p_adj <- p.adjust(cor_results$pval, method = 'BH') -->
+<!--   cor_results <- cor_results[order(cor_results$cor, decreasing = TRUE),] -->
+<!--   # get possitively and negatively associated features from data_mat -->
+<!--   pos_assoc <- rownames(cor_results[cor_results$cor > 0 & cor_results$p_adj < FDR,]) -->
+<!--   neg_assoc <- rownames(cor_results[cor_results$cor < 0 & cor_results$p_adj < FDR,]) -->
+<!--   return(list(cor_results = cor_results, -->
+<!--               pos_assoc = pos_assoc, -->
+<!--               neg_assoc = neg_assoc)) -->
+<!-- } -->
+
+<!-- ``` -->
+
+<!-- # ``` {r, results='asis'} -->
+<!-- # for (i in 1:5) { -->
+<!-- #   suppressWarnings({ -->
+<!-- #     pc_vect <- Seurat::PCAEmbed(BTSC_Tumour_combined_obj, dims.use = i) -->
+<!-- #     cor_results <- correlate_var_w_genes(var1 = pc_vect, -->
+<!-- #                                         data_mat = t(BTSC_Tumour_combined_obj@data), -->
+<!-- #                                         method = 'spearman') -->
+<!-- #   }) -->
+<!-- #     # cat(paste('\n\n## PC', i, '\n\n')) -->
+<!-- #     pos_pathways <- run_fisher_pathways(genesets = cor_results['pos_assoc'],  -->
+<!-- #                                         GSA_gmt = pathway_genesets,  -->
+<!-- #                                         master.set = rownames(BTSC_Tumour_combined_obj@data),  -->
+<!-- #                                         FDR = 0.10, filter.by.fdr = TRUE) -->
+<!-- #     neg_pathways <- run_fisher_pathways(genesets = cor_results['neg_assoc'],  -->
+<!-- #                                         GSA_gmt = pathway_genesets,  -->
+<!-- #                                         master.set = rownames(BTSC_Tumour_combined_obj@data),  -->
+<!-- #                                         FDR = 0.10, filter.by.fdr = TRUE) -->
+<!-- #     # cat('\n\n ### pos_pathways') -->
+<!-- #     # print(knitr::kable(pos_pathways)) -->
+<!-- #     # cat('\n\n ### neg pathways \n\n') -->
+<!-- #     # print(knitr::kable(neg_pathways)) -->
+<!-- #     # cat('\n\n') -->
+<!-- #     write.csv(pos_pathways, file = file.path(output_dir, paste0('PC', i, '_pos_pathways.csv'))) -->
+<!-- #     write.csv(neg_pathways, file = file.path(output_dir, paste0('PC', i, '_neg_pathways.csv'))) -->
+<!-- #      -->
+<!-- # } -->
+<!-- #  -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ``` -->
+
+# session info
+
+``` {r}
+Sys.time()
+sessionInfo()
+```
+

@@ -1,0 +1,367 @@
+---
+title: "Miscellaneous Tasks, laura_SU2C_GBM_GSCs_combined analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+``` {r}
+library(corrplot)
+library(ComplexHeatmap)
+library(circlize)
+library(pheatmap)
+source('./laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+output_dir <- '../../results/scRNA/laura_SU2C_GBM_GSCs_combined_misc_tasks'
+preproc_dir <- '../../data/preprocessed/scRNA/GSCs_Tumour_combined/'
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+```
+
+# Load Data, Save Metadata to file
+``` {r}
+# fname <- '../../data/preprocessed/scRNA/GSCs_Tumour_combined/laura_BTSC_Tumour_combined_Oct_2019.rds'
+# fname <- '../../data/preprocessed/scRNA/GSCs_Tumour_combined/laura_BTSC_Tumour_combined_Oct_2019_no_G800_L.rds'
+# fname <- '../../results/scRNA/laura_SU2C_GSCs_GBM_combined_Oct_2019_logistic/logistic_regression_T_v_L_seurat.rds'
+fname <- '../../results/scRNA/laura_SU2C_GSCs_GBM_combined_Oct_2019_no_G800_L_logistic/logistic_regression_T_v_L_seurat.rds'
+BTSC_Tumour_combined_obj <- readRDS(fname)
+# dump raw.data and scale.data slots as we are not recalculating PCA, and not pulling anything from these slots for plotting
+BTSC_Tumour_combined_obj@raw.data <- NULL
+BTSC_Tumour_combined_obj@scale.data <- NULL
+gc(full = TRUE)
+# add is_G800_L to plots
+BTSC_Tumour_combined_obj@meta.data$is_G800_L <- BTSC_Tumour_combined_obj@meta.data$SampleID == 'G800_L'
+
+write.csv(BTSC_Tumour_combined_obj@meta.data, file.path(preproc_dir, 'metadata_SU2C_GBM_GSCs_combined_Oct_2019_no_G800_L_w_logistic_predictions.csv'))
+
+```
+
+# Misc PCA plots
+
+``` {r, fig.with=5, fig.height= 4}
+
+
+# BTSC_Tumour_combined_obj <- subset_seurat(BTSC_Tumour_combined_obj)
+AUC_names <- colnames(BTSC_Tumour_combined_obj@meta.data)[grep('AUC$', colnames(BTSC_Tumour_combined_obj@meta.data))]
+scores_plot <- AUC_names[grep('Neftel|Suva|glioma.stem.cell|cahoy_astrocyte', AUC_names)]
+scores_plot <- c(scores_plot, c('C1_C2_diff', 'G2M.Score', 'S.Score'))
+other_feats <- c('is_G800_L', 'SampleType')
+make_dr_plots(BTSC_Tumour_combined_obj, dim1 = 1, dim2 = 2, feats_plot = c(scores_plot, other_feats), reduction.use = 'pca')
+make_dr_plots(BTSC_Tumour_combined_obj, dim1 = 1, dim2 = 3, feats_plot = c(scores_plot, other_feats), reduction.use = 'pca')
+
+```
+
+# contour plot with G800_L marked
+
+``` {r}
+p <- make_contour_plot(BTSC_Tumour_combined_obj, dim1 = 1, dim2 = 2, 
+                       reduction_use = 'pca', split_by = 'is_G800_L', bins = 3, 
+                       density_ceiling = 0.7)
+print(p)
+
+p <- make_contour_plot(BTSC_Tumour_combined_obj, dim1 = 1, dim2 = 3, 
+                       reduction_use = 'pca', split_by = 'is_G800_L', bins = 3, 
+                       density_ceiling = 0.7)
+print(p)
+# df <- as.data.frame(BTSC_Tumour_combined_obj@dr$pca@cell.embeddings[,c(1,3)])
+# dens_grid <- get_density_grid(df, var1 = 'PC1', var2 = 'PC3', density_ceiling = 0.7)
+# p <- ggplot(dens_grid) + geom_point(aes(PC1, PC3, color = density))
+# print(p)
+# dens_grid <- get_density_grid(df, var1 = 'PC1', var2 = 'PC3', density_ceiling = 0.99999)
+# p <- ggplot(dens_grid) + geom_point(aes(PC1, PC3, color = density))
+# print(p)
+# quantile(dens_grid$density, probs = seq(0, 1, 0.05))
+```
+
+# contour plot with stem like tumour cells plotted
+
+``` {r}
+gc(full = TRUE)
+
+# PC1/PC2
+p <- make_contour_plot(BTSC_Tumour_combined_obj, dim1 = 1, dim2 = 2, 
+                       reduction_use = 'pca', split_by = 'SampleType', bins = 3, 
+                       density_ceiling = 0.7)
+print(p)
+cell_names <- rownames(BTSC_Tumour_combined_obj@meta.data)
+is_tumour <- BTSC_Tumour_combined_obj@meta.data$SampleType == 'Tumour'
+is_stem_like <-BTSC_Tumour_combined_obj@meta.data$pred_class == 'Line' 
+stem_like_tumour <- is_tumour & is_stem_like
+embeddings_use <- Seurat::GetCellEmbeddings(BTSC_Tumour_combined_obj, reduction.type = 'pca', dims.use = 1:2,
+                                            cells.use = cell_names[stem_like_tumour])
+embeddings_use <- as.data.frame(embeddings_use)
+embeddings_use$density <- rep('NULL', nrow(embeddings_use))
+p <- p + geom_point(mapping = aes(x = PC1, y = PC2), data = embeddings_use, color = 'black', size = 1.0)
+print(p)
+# PC2/PC3
+p <- make_contour_plot(BTSC_Tumour_combined_obj, dim1 = 1, dim2 = 3, 
+                       reduction_use = 'pca', split_by = 'SampleType', bins = 3, 
+                       density_ceiling = 0.7)
+print(p)
+cell_names <- rownames(BTSC_Tumour_combined_obj@meta.data)
+is_tumour <- BTSC_Tumour_combined_obj@meta.data$SampleType == 'Tumour'
+is_stem_like <-BTSC_Tumour_combined_obj@meta.data$pred_class == 'Line' 
+stem_like_tumour <- is_tumour & is_stem_like
+embeddings_use <- Seurat::GetCellEmbeddings(BTSC_Tumour_combined_obj, reduction.type = 'pca', dims.use = 1:3,
+                                            cells.use = cell_names[stem_like_tumour])
+embeddings_use <- as.data.frame(embeddings_use)
+embeddings_use$density <- rep('NULL', nrow(embeddings_use))
+p <- p + geom_point(mapping = aes(x = PC1, y = PC3), data = embeddings_use, color = 'black', size = 1.0)
+print(p)
+```
+
+<!-- # misc pca plots with new embeddings -->
+
+<!-- ``` {r} -->
+<!-- for (feat in c(scores_plot, other_feats)) { -->
+<!--   p <- scatter_generic(embeddings_df, var1 = 'sum_PC1_PC3', var2 = 'sum_PC1_PC2', filter_by = NULL, -->
+<!--                        filter_class = NULL, pt.size = 0.5, color_by = feat) -->
+<!--   p <- p + ggtitle(feat) -->
+<!--   print(p) -->
+<!-- } -->
+
+<!-- p <- scatter_generic(embeddings_df, var1 = 'glioma.stem.cell_AUC', var2 = 'C1_C2_diff', filter_by = NULL, -->
+<!--                        filter_class = NULL, pt.size = 0.5, color_by = 'SampleType') -->
+<!-- p <- p + ggtitle(feat) -->
+<!-- print(p) -->
+<!-- ``` -->
+
+
+
+
+# heatmap with only features of interest
+
+``` {r}
+
+AUC_scores <- colnames(BTSC_Tumour_combined_obj@meta.data)[grep('AUC$', colnames(BTSC_Tumour_combined_obj@meta.data))]
+score_regex <- paste('RNA.GSC.c[1-2]',
+                     'cahoy_astrocyte',
+                     'cahoy_astro_young',
+                     'cahoy_astro_mature',
+                     'cahoy_oligodendrocyte',
+                     'cahoy_neuron',
+                     'a2.astro',
+                     'a1.astro',
+                     sep = '|')
+
+AUC_scores <- AUC_scores[grep(score_regex, AUC_scores)]
+other_feats <- c('G2M.Score', 'S.Score')
+genes_of_interest <- c('GFAP', 'FOS', 'AQP4', 'OLIG1', 'OLIG2', 'SOX2', 'CD44')
+PCs_use <- c('PC1', 'PC2')
+
+fetched_data <- FetchData(BTSC_Tumour_combined_obj, vars = c(AUC_scores, genes_of_interest, PCs_use, other_feats))
+cor_mat <- cor(fetched_data, method = 'pearson')
+cor_mat_order <- hclust(as.dist(1-cor_mat))$order
+cor_mat <- cor_mat[cor_mat_order, cor_mat_order]
+reorder_inds <- c(grep('^PC[0-9]', rownames(cor_mat)), grep('^PC[0-9]', rownames(cor_mat), invert = TRUE))
+cor_mat <- cor_mat[reorder_inds, reorder_inds]
+rownames(cor_mat) <- colnames(cor_mat) <- sub('RNA.GSC.c1', 'Developmental', rownames(cor_mat))
+rownames(cor_mat) <- colnames(cor_mat) <- sub('RNA.GSC.c2', 'Injury_Response', rownames(cor_mat))
+corrplot(cor_mat, tl.cex = 0.7, order = 'original')
+
+```
+
+<!-- # heatmap of 'stem like' and non-stem like cells and features of interest -->
+
+<!-- ``` {r} -->
+<!-- # if stem like, predicted class under logistic regression model should have been stem -->
+<!-- stem_like <- BTSC_Tumour_combined_obj$pred_class == 'Line' -->
+<!-- SampleType <- BTSC_Tumour_combined_obj$SampleType -->
+<!-- order_by_stem <- order(stem_like) -->
+<!-- fetched_data <- fetched_data[order_by_stem,] -->
+<!-- stem_like <- stem_like[order_by_stem] -->
+<!-- SampleType <- SampleType[order_by_stem] -->
+
+<!-- # heatmap for all samples -->
+<!-- hclust_pc1_pc2 <- hclust(dist(fetched_data[,c('PC_1', 'PC_2')]), method = 'complete') -->
+<!-- top_ann <- HeatmapAnnotation(df = data.frame(stem_like = stem_like, sample_type = SampleType), -->
+<!--                             col = list(stem_like = c('TRUE' = 'turquoise', -->
+<!--                                                       'FALSE' = 'magenta'), -->
+<!--                                        sample_type = c('Line' = 'blue', -->
+<!--                                                         'Tumour' = 'red'))) -->
+
+<!-- hm <- Heatmap(t(scale(fetched_data)), show_column_names = FALSE, cluster_columns = hclust_pc1_pc2, -->
+<!--               top_annotation = top_ann) -->
+<!-- draw(hm) -->
+
+<!-- # heatmap for just tumour samples -->
+<!-- tumour_inds <- which(SampleType == 'Tumour') -->
+<!-- # hclust_pc1_pc2_tumour <- hclust(dist(fetched_data[tumour_inds, c('PC_1', 'PC_2')]), method = 'complete') -->
+<!-- top_ann_tumour <- HeatmapAnnotation(df = data.frame(stem_like = stem_like[tumour_inds],  -->
+<!--                                                     sample_type = SampleType[tumour_inds]), -->
+<!--                                     col = list(stem_like = c('TRUE' = 'turquoise', -->
+<!--                                                       'FALSE' = 'magenta'), -->
+<!--                                        sample_type = c('Line' = 'blue', -->
+<!--                                                         'Tumour' = 'red'))) -->
+<!-- hm <- Heatmap(t(scale(fetched_data[tumour_inds,])), show_column_names = FALSE, cluster_columns = FALSE, -->
+<!--               top_annotation = top_ann_tumour) -->
+<!-- draw(hm) -->
+<!-- # # rownames(mat_col) <- colnames(mat) -->
+<!-- #  -->
+<!-- # # List with colors for each annotation. -->
+<!-- # mat_colors <- list(stem_like = c('turquoise', 'magenta'), -->
+<!-- #                    sample_type = c('red', 'blue')) -->
+<!-- # names(mat_colors$stem_like) <- unique(annotation_df$stem_like) -->
+<!-- # names(mat_colors$sample_type) <- unique(annotation_df$sample_type) -->
+
+<!-- # pheatmap( -->
+<!-- #   mat               = t(fetched_data), -->
+<!-- #   color             = inferno(10), -->
+<!-- #   border_color      = NA, -->
+<!-- #   show_colnames     = FALSE, -->
+<!-- #   show_rownames     = FALSE, -->
+<!-- #   annotation_col    = annotation_df, -->
+<!-- #   annotation_colors = NULL, -->
+<!-- #   drop_levels       = FALSE, -->
+<!-- #   fontsize          = 14, -->
+<!-- #   main              = "Default Heatmap" -->
+<!-- # ) -->
+
+<!-- ``` -->
+
+
+<!-- # ``` {r} -->
+<!-- # rm(BTSC_Tumour_combined_obj) -->
+<!-- # gc(full = TRUE) -->
+<!-- # ``` -->
+
+<!-- # association of features within tumour -->
+
+<!-- ``` {r} -->
+<!-- tumour_inp_file <- '/home/owenwhitley/projects/su2c_v2/data/preprocessed/scRNA/GSCs_Tumour_combined/GBM_Tumour_seurat_v3.rds' -->
+<!-- tumour_html_output_dir <- './laura_SU2C_GBM_repreprocess' -->
+<!-- tumour_data <- readRDS(file = tumour_inp_file) -->
+<!-- AUC_scores <- colnames(tumour_data@meta.data)[grep('AUC$', colnames(tumour_data@meta.data))] -->
+<!-- score_regex <- paste('RNA.GSC.c[1-2]', -->
+<!--                      'glioma.stem.cell', -->
+<!--                      'Zhong_NPCs_upreg', -->
+<!--                      'nowakowski_(RG-early|IPC-div[1-2])', -->
+<!--                      'cahoy',  -->
+<!--                      'a[1-2].astro', -->
+<!--                      'tirosh', -->
+<!--                      sep = '|') -->
+<!-- AUC_scores <- AUC_scores[grep(score_regex, AUC_scores)] -->
+<!-- other_feats <- c('PC_1', 'PC_2', 'PC_3', 'CC.Difference', 'G2M.Score', 'S.Score', 'C1_C2_diff') -->
+<!-- fetched_data <- FetchData(tumour_data, vars = c(AUC_scores, other_feats)) -->
+
+<!-- cor_mat <- cor(fetched_data, method = 'spearman') -->
+<!-- cor_mat_order <- hclust(as.dist(1-cor_mat))$order -->
+<!-- cor_mat <- cor_mat[cor_mat_order, cor_mat_order] -->
+
+<!-- corrplot::corrplot(cor_mat, tl.cex = 0.5) -->
+
+<!-- ``` -->
+
+<!-- # association of c1/c2 gradient with various pathways in tumour -->
+
+<!-- ``` {r} -->
+<!-- # load in pathways from gmt file -->
+<!-- capt_out <- capture.output(pathway_genesets <- -->
+<!--                              GSA.read.gmt('/home/owenwhitley/GSEA/gmts/Human_GOBP_AllPathways_no_GO_iea_December_01_2018_symbol.gmt') -->
+<!--           ) -->
+<!-- rm(capt_out) -->
+<!-- # sanity check on pathways -->
+<!-- any(as.logical(lapply(pathway_genesets$genesets, FUN = function(x) {any(x == '')}))) -->
+<!-- all(as.logical(lapply(pathway_genesets$genesets, FUN = function(x) {any(x == '')}))) -->
+<!-- # there are some empty entries due to a parsing bug. fix for all genesets -->
+<!-- pathway_genesets$genesets <- lapply(pathway_genesets$genesets, FUN = function(x) {return(x[-which(x == '')])}) -->
+<!-- any(as.logical(lapply(pathway_genesets$genesets, FUN = function(x) {any(x == '')}))) -->
+<!-- head(pathway_genesets$genesets[1:5]) -->
+<!-- # filter all genesets first for genese in our 'master geneset' -->
+<!-- tumour_logNorm <- GetAssayData(tumour_data, assay = 'RNA', slot = 'data') -->
+<!-- valid_genes <- rownames(tumour_logNorm) -->
+<!-- # valid_genes <- sample(valid_genes, replace = FALSE, size = 500) -->
+<!-- pathway_genesets$genesets <- lapply(pathway_genesets$genesets, FUN = function(x) {return(x[x %in% valid_genes])}) -->
+<!-- # then filter by geneset size -->
+<!-- min_size = 15 -->
+<!-- max_size = 200 -->
+<!-- passes_size_thresh <- as.logical(lapply(pathway_genesets$genesets, FUN = function(x) { -->
+<!--   return(length(x) > min_size && length(x) < max_size) -->
+<!-- })) -->
+<!-- pathway_genesets <- lapply(pathway_genesets, FUN = function(x) {return(x[which(passes_size_thresh)])}) -->
+<!-- length(which(passes_size_thresh)) -->
+
+<!-- # Correlate genes with RNA.GSC.c1 signature and RNA.GSC.c2 signature (specifically difference between the 2) -->
+<!-- # see preprocess_GeneSets.Rmd script for more details -->
+
+
+<!-- correlate_var_w_genes <- function(var1, data_mat, method = 'spearman', FDR = 0.10) { -->
+<!--   cor_vals <- apply(data_mat, MARGIN = 2, FUN = function(x) { -->
+<!--     cor_val <- cor(x, var1, method = method) -->
+<!--   }) -->
+<!--   pvals <- apply(data_mat, MARGIN = 2, FUN = function(x) { -->
+<!--     cor_pval <- cor.test(x, var1, method = method)$p.value -->
+<!--   }) -->
+<!--   cor_results <- data.frame(cor = cor_vals, pval = pvals) -->
+<!--   cor_results$p_adj <- p.adjust(cor_results$pval, method = 'BH') -->
+<!--   cor_results <- cor_results[order(cor_results$cor, decreasing = TRUE),] -->
+<!--   # get possitively and negatively associated features from data_mat -->
+<!--   pos_assoc <- rownames(cor_results[cor_results$cor > 0 & cor_results$p_adj < FDR,]) -->
+<!--   neg_assoc <- rownames(cor_results[cor_results$cor < 0 & cor_results$p_adj < FDR,]) -->
+<!--   return(list(cor_results = cor_results, -->
+<!--               pos_assoc = pos_assoc, -->
+<!--               neg_assoc = neg_assoc)) -->
+<!-- } -->
+
+<!-- suppressWarnings({ -->
+<!--   cor_results_C1_C2_diff <- correlate_var_w_genes(var1 = tumour_data$C1_C2_diff, -->
+<!--                                                    data_mat = t(tumour_logNorm)) -->
+<!-- }) -->
+
+
+<!-- # run fisher's exact test for each geneset/pathway pair for 2 genesets, C1 associated genes, -->
+<!-- # C2 associati -->
+<!-- enriched_pathways_results <- run_fisher_pathways(genesets = list(C1_assoc_tumour = cor_results_C1_C2_diff$pos_assoc, -->
+<!--                                                                  C2_assoc_tumour = cor_results_C1_C2_diff$neg_assoc), -->
+<!--                                                  GSA_gmt = pathway_genesets, -->
+<!--                                                  master.set = valid_genes, -->
+<!--                                                  FDR = 0.1) -->
+<!-- # C1 (proneural) associated pathways -->
+<!-- enriched_pathways_results[enriched_pathways_results$geneset == 'C1_assoc_tumour',] -->
+<!-- # C2 (Immuno-Mesenchymal) associated -->
+<!-- enriched_pathways_results[enriched_pathways_results$geneset == 'C2_assoc_tumour',] -->
+
+<!-- # write results to files -->
+<!-- write.csv(enriched_pathways_results[enriched_pathways_results$geneset == 'C1_assoc_tumour',], -->
+<!--           file = file.path(output_dir, 'tumour_RNA_GSC_c1_assoc_pathways.csv')) -->
+
+<!-- write.csv(enriched_pathways_results[enriched_pathways_results$geneset == 'C2_assoc_tumour',], -->
+<!--           file = file.path(output_dir, 'tumour_RNA_GSC_c2_assoc_pathways.csv')) -->
+<!-- ``` -->
+
+<!-- # do the same, but for 'glioma stem cell AUC' associated genes -->
+
+<!-- ``` {r} -->
+<!-- # association of genes with glioma stem cell AUCell score -->
+<!-- suppressWarnings({ -->
+<!--   cor_results_glioma_stem_cell <- correlate_var_w_genes(var1 = tumour_data$glioma.stem.cell_AUC, -->
+<!--                                                    data_mat = t(tumour_logNorm)) -->
+<!-- }) -->
+
+<!-- # run fisher's exact test for each geneset/pathway pair for 2 genesets, C1 associated genes, -->
+<!-- # C2 associati -->
+<!-- enriched_pathways_results <- run_fisher_pathways(genesets = list(GSC_assoc_tumour = cor_results_glioma_stem_cell$pos_assoc, -->
+<!--                                                                  nonGSC_assoc_tumour = cor_results_glioma_stem_cell$neg_assoc), -->
+<!--                                                  GSA_gmt = pathway_genesets, -->
+<!--                                                  master.set = valid_genes, -->
+<!--                                                  FDR = 0.1) -->
+<!-- # glioma stem cell score positively associated pathways -->
+<!-- enriched_pathways_results[enriched_pathways_results$geneset == 'GSC_assoc_tumour',] -->
+<!-- # glioma stem cell score negatively associated pathways -->
+<!-- enriched_pathways_results[enriched_pathways_results$geneset == 'nonGSC_assoc_tumour',] -->
+
+<!-- # write results to files -->
+<!-- write.csv(enriched_pathways_results[enriched_pathways_results$geneset == 'GSC_assoc_tumour',], -->
+<!--           file = file.path(output_dir, 'tumour_GSC_assoc_pathways.csv')) -->
+
+<!-- write.csv(enriched_pathways_results[enriched_pathways_results$geneset == 'nonGSC_assoc_tumour',], -->
+<!--           file = file.path(output_dir, 'tumour_nonGSC_assoc_pathways.csv')) -->
+<!-- ``` -->
+
+# session info
+
+``` {r}
+Sys.time()
+sessionInfo()
+```
+

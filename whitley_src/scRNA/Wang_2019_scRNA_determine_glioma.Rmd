@@ -1,0 +1,123 @@
+---
+title: "Determine Glioma cells"
+output:
+    html_document:
+    df_print: paged
+    toc: True
+    toc_depth: 4
+params:
+  inp_data: '~/projects/su2c_v2/data/preprocessed/scRNA/Wang_2019_CancerDiscov/Wang_scRNA_full_seurat.rds'
+  output_dir: '~/projects/su2c_v2/data/preprocessed/scRNA/Wang_2019_CancerDiscov_Tumour_Filtered/'
+  feats_plot: 'NULL'
+  pcs_plot: 2
+---
+
+
+
+```{r}
+top_dir <- '~/projects/su2c_v2'
+gene_sets_dir <- file.path(top_dir, '/data/preprocessed/GeneSets')
+suppressPackageStartupMessages({source('laura_SU2C_GBM_GSCs_combined_explore_helpers.R')})
+for (i in 1:length(params)) {
+  param.i <- names(params)[i]
+  assign(param.i, params[[i]])
+}
+
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+
+if (is.character(inp_data)) {
+      # we only load data in from file for testing/debugging purposes.
+      # inp_data should generally be a Seurat object that is fully preprocessed 
+      # as outlined in 'seurat_pipeline' function in helper functions,
+      # with PCA calculated
+      if (file.exists(inp_data)) {
+        inp_data <- readRDS(inp_data)
+      } else {
+        stop('File for input data does not exist')
+      }
+}
+
+if (feats_plot == 'NULL') {
+  feats_plot <- c(paste0('chr.', c(7,10)), 'cahoy_astrocyte_AUC', 'cahoy_oligodendrocyte_AUC', 'cahoy_neuron_AUC', 'Zhong_Microglia_upreg_AUC',
+                  'nowakowski_Endothelial_upreg_AUC', 'Neftel_Macrophage_AUC', 'RNA_GSC_line_classifier_AUC', 'cluster', 'SampleID')
+}
+
+```
+
+
+
+# Examine Chromosome Amplifications + Other Features, Split By Cluster
+
+Features are based on figure 1A (cell types shown to be non-malignant) in Wang et al. 2019
+
+``` {r}
+# meta_data <- inp_data@meta.data
+for (feat in feats_plot) {
+  if (!is.numeric(inp_data@meta.data[,feat])) {
+    next
+  }
+  p <- sc_jitter_plot(inp_data, y_axis = feat, split_by = 'cluster', color_by = 'SampleID', 
+                          filter_by = NULL, filter_class = NULL, comparisons = NULL, mode = 'jitter', size = 0.5, 
+                           dodge_width = 0.75, jitter_width = 0.2)
+  print(p)
+  p <- sc_jitter_plot(inp_data, y_axis = feat, split_by = 'cluster', color_by = 'chr.7', 
+                          filter_by = NULL, filter_class = NULL, comparisons = NULL, mode = 'jitter', size = 0.5, 
+                           dodge_width = 0.75, jitter_width = 0.2)
+  print(p)
+  p <- sc_jitter_plot(inp_data, y_axis = feat, split_by = 'cluster', color_by = 'chr.10', 
+                          filter_by = NULL, filter_class = NULL, comparisons = NULL, mode = 'jitter', size = 0.5, 
+                           dodge_width = 0.75, jitter_width = 0.2)
+  print(p)
+}
+
+```
+
+
+# Remove Clusters 3, 4, 5 from data
+
+5 is likely endothelial, 4 is likely oligodendrocyte, 3 is likely microglia. It is likely that there are astrocytes in the data, given Figure 1A in Wang et al. 2019, but for now we can't distinguish them (clusterwise) from teh rest of the tumour. If we really wanted to be sure we were only looking at tumour cells, we'd look for things with an amplification of chromosome 7 and deletion of 10.
+
+``` {r}
+inp_data@meta.data$is.glioma <- !(inp_data@meta.data$cluster %in% c('3', '4', '5'))
+make_dr_plots(inp_data, 1, 2, 'tsne', c(feats_plot, 'is.glioma'), pt.size = 1.0, legend_pt_size = 5)
+```
+
+# Subset Data + Rerun Pipeline, Saving Output
+
+``` {r}
+cells_use <- rownames(inp_data@meta.data)[inp_data@meta.data$is.glioma]
+data_mat <- inp_data@raw.data[,cells_use]
+metadata_subs <- inp_data@meta.data[cells_use,]
+rm(inp_data)
+gc(full = TRUE)
+```
+
+``` {r}
+# Load Genesets
+gene_sets_file <- 'genesets_and_info.rds'
+genesets_and_info <- readRDS(file = file.path(gene_sets_dir, gene_sets_file))
+genesets <- genesets_and_info$gene_set_list
+# rename RNA.GSC.c1, RNA.GSC.c2 to Developmental, Injury Response, repectively
+genesets$Developmental <- genesets$RNA.GSC.c1
+genesets$RNA.GSC.c1 <- NULL
+genesets$Injury_Response <- genesets$RNA.GSC.c2
+genesets$RNA.GSC.c2 <- NULL
+```
+
+``` {r}
+seurat_obj <- seurat_subroutine(raw_data = data_mat, meta_data = metadata_subs)
+seurat_obj <- scoring_subroutine(seurat_obj, genesets, output_dir, 'Wang_2019_scRNA_filtered')
+
+# Final dims
+dim(seurat_obj@data)
+
+saveRDS(seurat_obj, file = file.path(output_dir, 'Wang_2019_scRNA_filtered.rds'))
+```
+
+# Session Info
+
+``` {r}
+sessionInfo()
+```

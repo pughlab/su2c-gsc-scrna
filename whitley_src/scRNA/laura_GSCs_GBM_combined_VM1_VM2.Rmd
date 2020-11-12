@@ -1,0 +1,154 @@
+---
+title: "CRISPR Screen, GSCs. Fisher's Exact Test on Essential Pathways"
+output:
+  html_document:
+    df_print: paged
+---
+
+``` {r}
+library(knitr)
+library(doParallel)
+library(doSNOW)
+library(SummExpDR)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+``` {r}
+do_fisher_multi <- function(query_set, pathways_list, master_set, FDR = 0.10, n_cores = 1) {
+  # query_set = character vector
+  # pathways_list = named list of pathways
+  # master_set = character vector. all strings in query_set and pathways_list must be subset of strings in master set
+  # FDR to filter at for fisher's exact test
+  # n_cores = number of cores to use
+  do_fisher_single <- function(x) {
+    return(fisher_test_sets(set1 = query_set, set2 = pathways_list[[x]], master_set = master_set)$p.value)
+  }
+  if (n_cores == 1) {
+    p_vals <- rep(NA, length(pathways_list))
+    pb <- txtProgressBar(max = length(pathways_list), style = 3)
+    for (i in 1:length(pathways_list)) {
+      p_vals[i] <- do_fisher_single(i)
+      setTxtProgressBar(pb, i)
+    }
+    close(pb)
+  } else {
+    # do parallel runs
+    cl <- snow::makeCluster(n_cores)
+    doSNOW::registerDoSNOW(cl)
+    pb <- txtProgressBar(max = length(pathways_list), style = 3)
+    progress <- function(n) setTxtProgressBar(pb, n)
+    opts <- list(progress = progress)
+    `%dopar%` <- foreach::`%dopar%`
+    p_vals <- foreach::foreach(i = 1:length(pathways_list), .options.snow = opts, .combine = 'c') %dopar%
+      {
+        return(do_fisher_single(i))
+      }
+    snow::stopCluster(cl)
+  }
+  pathways <- names(pathways_list)
+  fdr <- p.adjust(p_vals, method = 'BH')
+  df <- data.frame(pathway = pathways, p_val = p_vals, fdr = fdr, stringsAsFactors = FALSE)
+  df <- df[df$fdr < FDR, ]
+  return(df)
+}
+```
+
+# Load Data
+
+``` {r}
+data_dir <- '~/projects/su2c_v2/data/preprocessed/scRNA/GSCs_Tumour_combined_w_varimax_PC1_PC2'
+
+seurat_obj <- readRDS(file.path(data_dir, "laura_BTSC_Tumour_combined_Oct_2019_no_G800_L_w_varimax_PC1_PC2.rds"))
+seurat_pca_genes <- rownames(seurat_obj@scale.data)
+VM_loadings <- Seurat::GetDimReduction(seurat_obj, reduction.type = 'varimax', slot = 'gene.loadings')
+
+rm(seurat_obj)
+gc(full = TRUE)
+
+# load biological pathway mappings
+gmt_file <- '~/projects/su2c_v2/data/raw/gmt_files/baderlab_gmts/Human_GO_AllPathways_no_GO_iea_April_01_2018_symbol.gmt'
+capt_out <- capture.output(baderlab_pathways <- GSA::GSA.read.gmt(gmt_file))
+
+pathways_list <- baderlab_pathways$genesets
+names(pathways_list) <- baderlab_pathways$geneset.names
+pathways_list <- lapply(pathways_list, FUN = function(x) {
+    if (any(x == '')) {
+      x <- x[-which(x == '')]
+    }
+  return(x)
+})
+
+# filter pathways for genes in pca genes
+pathways_list <- lapply(pathways_list, FUN = function(x) {
+  return(x[x %in% seurat_pca_genes])
+})
+
+# filter pathways by number of genes
+min_gs_size <- 15
+max_gs_size <- 200
+pathway_sizes <- unlist(lapply(pathways_list, length))
+passes_size <- pathway_sizes >= min_gs_size & pathway_sizes <= max_gs_size
+print(paste('keeping', sum(passes_size), 'of', length(pathways_list), 'pathways'))
+```
+
+``` {r, results=FALSE}
+# get loadings
+
+
+get_top_loadings <- function(gene_loadings, i, n = 50L) {
+  loadings_i <- gene_loadings[,i]
+  top_n_down <- names(sort(loadings_i, decreasing = FALSE)[1:n])
+  top_n_up <- names(sort(loadings_i, decreasing = TRUE)[1:n])
+  return(list(top_pos = top_n_up, top_neg = top_n_down))
+}
+        
+
+VM1_top_loadings <- get_top_loadings(VM_loadings, 'VM1')
+VM2_top_loadings <- get_top_loadings(VM_loadings, 'VM2')
+# do pathway analysis
+VM1_pos_pathways <- do_fisher_multi(VM1_top_loadings$top_pos, pathways_list, seurat_pca_genes, FDR = 0.10, n_cores = 1)
+VM1_neg_pathways <- do_fisher_multi(VM1_top_loadings$top_neg, pathways_list, seurat_pca_genes, FDR = 0.10, n_cores = 1)
+VM2_pos_pathways <- do_fisher_multi(VM2_top_loadings$top_pos, pathways_list, seurat_pca_genes, FDR = 0.10, n_cores = 1)
+VM2_neg_pathways <- do_fisher_multi(VM2_top_loadings$top_neg, pathways_list, seurat_pca_genes, FDR = 0.10, n_cores = 1)
+
+
+```
+
+# Pathway Analysis Results
+
+Pathway analysis performed on top or bottom 50 genes (by loadings) for Varimax rotated PCs
+
+## VM1
+
+### Pos
+
+``` {r}
+VM1_pos_pathways
+```
+
+### Neg
+
+``` {r}
+VM1_neg_pathways
+```
+
+## VM2
+
+### Pos
+
+``` {r}
+VM2_pos_pathways
+```
+
+### Neg
+
+``` {r}
+VM2_neg_pathways
+```
+
+# Session Info
+
+``` {r}
+sessionInfo()
+```
