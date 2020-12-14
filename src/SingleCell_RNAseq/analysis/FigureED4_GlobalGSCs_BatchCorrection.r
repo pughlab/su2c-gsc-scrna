@@ -16,7 +16,6 @@
 ##############################################################
 
 
-
 ##############################################################
 # 1) Install + Load packages
 ##############################################################
@@ -285,52 +284,11 @@ dev.off()
 saveRDS(BTSC_fMNN, file = "Global_SU2C_GSCs_Seurat_fastMNN.rds")
 
 
-
 ##############################################################
-# 6) Run Batchelor package options (future option)
-##############################################################
-
-### Ref: https://bioconductor.org/packages/release/bioc/html/batchelor.html
-
-
-##########################
-# 6.1) fastMNN
-##########################
-### already run above with seurat wrapper
-
-##########################
-# 6.2) Batch rescaling (do not use but reference in paper)
-##########################
-### While this method is fast and simple, it makes the strong assumption that
-### the population composition of each batch is the same. This is usually not
-### the case for scRNA-seq experiments in real systems that exhibit biological
-### variation. Thus, rescaleBatches() is best suited for merging technical
-### replicates of the same sample, e.g., that have been sequenced separately.
-
-##########################
-# 6.3) Multi-batch Normalization
-##########################
-### Differences in sequencing depth between batches are an obvious cause for
-### batch-to-batch differences. These can be removed by multiBatchNorm(), which
-### downscales all batches to match the coverage of the least-sequenced batch.
-### This function returns a list of SingleCellExperiment objects with log-
-### transformed normalized expression values that can be directly used for
-### further correction.
-
-##########################
-# 6.4) Multi-batch PCA
-##########################
-
-
-
-
-
-
-##############################################################
-# 7) Combine metadata across batch correction
+# 6) Combine metadata across batch correction
 ##############################################################
 
-### 7.1) Format original clustering
+### 6.1) Format original clustering
 load("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/Broad_Portal/seuratObjs/Global_SU2C_BTSCs_CCregressed_noRibo.Rdata")
 meta <- BTSC@meta.data
 meta$Original_clusters <- meta$res.2
@@ -339,31 +297,31 @@ meta <- cbind(meta, BTSC@dr$umap@cell.embeddings)
 colnames(meta) <- gsub("UMAP1", "Original_UMAP1", colnames(meta))
 colnames(meta) <- gsub("UMAP2", "Original_UMAP2", colnames(meta))
 
-### 7.2) Format CONOS
+### 6.2) Format CONOS
 conos <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/BatchCorrection/CONOS/Global_SU2C_GSCs_Seurat.CONOS.rds")
 meta$Conos_clusters <- paste0("C", conos@meta.data$leiden)
 meta$Conos_UMAP1 <- conos@reductions$UMAP@cell.embeddings[ ,1]
 meta$Conos_UMAP2 <- conos@reductions$UMAP@cell.embeddings[ ,2]
 
-### 7.3) Format LIGER
+### 6.3) Format LIGER
 liger <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/BatchCorrection/Liger/Global_SU2C_GSCs_Seurat_LIGER.rds")
 meta$Liger_clusters <- paste0("C", as.numeric(liger@meta.data$seurat_clusters))
 meta$Liger_quantNorm_clusters <- paste0("C", as.numeric(liger@meta.data$clusters))
 meta$Liger_UMAP1 <- liger@reductions$umap@cell.embeddings[ ,1]
 meta$Liger_UMAP2 <- liger@reductions$umap@cell.embeddings[ ,2]
 
-### 7.4) Format fastMNN
+### 6.4) Format fastMNN
 fastMNN <- readRDS("/cluster/projects/pughlab/projects/BTSCs_scRNAseq/Manuscript_G607removed/NatCan_Rebuttal/BatchCorrection/fastMNN/Global_SU2C_GSCs_Seurat_fastMNN.rds")
 meta$fastMNN_clusters <- paste0("C", as.numeric(fastMNN@meta.data$seurat_clusters))
 meta$fastMNN_UMAP1 <- fastMNN@reductions$umap@cell.embeddings[ ,1]
 meta$fastMNN_UMAP2 <- fastMNN@reductions$umap@cell.embeddings[ ,2]
 
-### 7.5) Save combined metadata
+### 6.5) Save combined metadata
 saveRDS(meta, file = "Global_GSC_BatchCorrection_metadata.rds")
 
 
 ##############################################################
-# 8) Combine normalized matrices into lists across technologies
+# 7) Combine normalized matrices into lists across technologies
 ##############################################################
 ### This is pointless because none of these tools change the expression values
 ### They operate on PCA or other dim reductions
