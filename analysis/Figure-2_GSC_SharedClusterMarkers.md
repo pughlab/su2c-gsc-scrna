@@ -3,7 +3,7 @@
 # 3.0 Plot Jaccard Distance between clusters
 ---
 
-Low jaccard distance means markers genes for clusters are very similar. 
+Low jaccard distance means markers genes for clusters are very similar.
 
 
 ```R
@@ -20,7 +20,7 @@ b[1:5, 1:5]
 ```
 
 
-              
+
                BT127_L_C1 BT127_L_C2 BT147_L_C1 BT147_L_C2 BT48_L_C1
       A1BG              0          0          0          0         0
       A1BG-AS1          0          0          0          0         0
@@ -36,7 +36,7 @@ b[1:5, 1:5]
 #Jaccaard distance measures dissimilairty between sample sets, subtracting Jaccard coefficient from 1
 # Jaccard distance = 1-(jaccard coefficient)
 
-jaccard <- dist(t(b), method = "binary") 
+jaccard <- dist(t(b), method = "binary")
 str(jaccard)
 ```
 
@@ -106,14 +106,14 @@ magma(n=15, direction = -1)
 
 
 col_fun = colorRamp2(c(0,1), c("white", "blue"))
-Heatmap(as.matrix(jaccard_index), 
-        name = "Jaccard \nIndex", 
+Heatmap(as.matrix(jaccard_index),
+        name = "Jaccard \nIndex",
         col = c("white", magma(n=15, direction = -1)),
         row_names_gp = gpar(fontsize = 4),
         column_names_gp = gpar(fontsize = 4),
         column_split = 2,
         row_split = 2
-       
+
        )
 
 #dev.off()
@@ -129,14 +129,14 @@ Heatmap(as.matrix(jaccard_index),
 
 
 ```R
-sim.clust <- c("G885_L_C1", 
+sim.clust <- c("G885_L_C1",
 "G566_L_C2",
 "BT89_L_C1" ,
 "BT147_L_C1" ,
 "BT67_L_C1" ,
 "G620_L_C3" ,
 "G637_L_C3" ,
-"G946.K_L_C2", 
+"G946.K_L_C2",
 "G876_L_C2" ,
 "G800_L_C2" ,
 "G799_L_C3" ,
@@ -5634,14 +5634,14 @@ mean(indices)
 ```R
 ## this list of clusters appears to be similar to eachother based on marker genes
 
-sim.clust <- c("G885_L_C1", 
+sim.clust <- c("G885_L_C1",
 "G566_L_C2",
 "BT89_L_C1" ,
 "BT147_L_C1" ,
 "BT67_L_C1" ,
 "G620_L_C3" ,
 "G637_L_C3" ,
-"G946−K_L_C2", 
+"G946−K_L_C2",
 "G876_L_C2" ,
 "G800_L_C2" ,
 "G799_L_C3" ,
@@ -5665,9 +5665,9 @@ length(genes)
 #358 genes found in all clusters
 
 genes
-write.table(genes, file = "~/Desktop/CommonMarkers_14clusters_BTSC_Sept2019.txt", 
-            quote = F, 
-            row.names = F, 
+write.table(genes, file = "~/Desktop/CommonMarkers_14clusters_BTSC_Sept2019.txt",
+            quote = F,
+            row.names = F,
             col.names = F
            )
 ```
@@ -5675,13 +5675,13 @@ write.table(genes, file = "~/Desktop/CommonMarkers_14clusters_BTSC_Sept2019.txt"
  ----
 #### Findings
 
-Across 29 samples, a set of clusters from  14 clusters from 13 samples have high marker similarity. They share 358 common marker genes found in all 14 clusters are related to cell cycling, expression of the DREAM complex nd oligodendrocyte differentiation (MSigDB) pathway analysis. 
+Across 29 samples, a set of clusters from  14 clusters from 13 samples have high marker similarity. They share 358 common marker genes found in all 14 clusters are related to cell cycling, expression of the DREAM complex nd oligodendrocyte differentiation (MSigDB) pathway analysis.
 
 
 Is this really interesting enough to put in the paper.....?
 
 ---
- 
+
  ### Pathway analysis on common core genes in similar clusters
 
 
@@ -6086,11 +6086,11 @@ length(genes)
 ```R
 #run enrichr
 
-a <- enricher(gene = genes, 
-              pvalueCutoff = 0.05, 
-              pAdjustMethod = "fdr", 
+a <- enricher(gene = genes,
+              pvalueCutoff = 0.05,
+              pAdjustMethod = "fdr",
               universe = universe,
-              qvalueCutoff = 0.01, 
+              qvalueCutoff = 0.01,
               TERM2GENE = gmt
              )
 a
@@ -6100,10 +6100,10 @@ a
     #
     # over-representation test
     #
-    #...@organism 	 UNKNOWN 
-    #...@ontology 	 UNKNOWN 
+    #...@organism 	 UNKNOWN
+    #...@ontology 	 UNKNOWN
     #...@gene 	 chr [1:358] "ABHD3" "AC004381.6" "ACYP1" "ALYREF" "ANLN" "APOLD1" ...
-    #...pvalues adjusted by 'fdr' with cutoff <0.05 
+    #...pvalues adjusted by 'fdr' with cutoff <0.05
     #...1223 enriched terms found
     'data.frame':	1223 obs. of  9 variables:
      $ ID         : chr  "DUTERTRE_ESTRADIOL_RESPONSE_24HR_UP" "KOBAYASHI_EGFR_SIGNALING_24HR_DN" "ZHANG_TLX_TARGETS_60HR_DN" "HALLMARK_E2F_TARGETS" ...
@@ -6119,7 +6119,7 @@ a
       Guangchuang Yu, Li-Gen Wang, Yanyan Han and Qing-Yu He.
       clusterProfiler: an R package for comparing biological themes among
       gene clusters. OMICS: A Journal of Integrative Biology
-      2012, 16(5):284-287 
+      2012, 16(5):284-287
 
 
 
@@ -6192,13 +6192,13 @@ library(ggplot2)
 
 
 ```R
-p <- ggplot(data=dat, aes(x=ID, y=Count, fill = log10.padj)) + 
+p <- ggplot(data=dat, aes(x=ID, y=Count, fill = log10.padj)) +
     geom_bar(stat="identity") +
     coord_flip() + xlab ("") + ylab("Gene Count") +
      scale_fill_gradient(low="blue", high="red", name = "Enrichment\n-log10(p.adjust)") + ggtitle("GSC Proliferation Module (358 genes)") + theme_classic() +
-    theme(axis.text.x = element_text(angle = 0, hjust = 1)) + 
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
       theme(panel.border = element_rect
-            (linetype = "solid", fill = NA)) + theme(text = element_text(size=13)) 
+            (linetype = "solid", fill = NA)) + theme(text = element_text(size=13))
 
 pdf("~/Desktop/GSC_clustercommonMarkers.pdf", width =11, height = 5)
 p
@@ -6216,7 +6216,7 @@ dev.off()
 
 ```R
 #a[grep("GRAHAM_NORMAL", rownames(a@result)), ]
- 
+
 ```
 
 ---
@@ -6277,14 +6277,14 @@ prop.table(table(subset$Gene))
 
 Remove the clusters that are high for cell cycling above:
 
-sim.clust <- c("G885_L_C1", 
+sim.clust <- c("G885_L_C1",
 "G566_L_C2",
 "BT89_L_C1" ,
 "BT147_L_C1" ,
 "BT67_L_C1" ,
 "G620_L_C3" ,
 "G637_L_C3" ,
-"G946−K_L_C2", 
+"G946−K_L_C2",
 "G876_L_C2" ,
 "G800_L_C2" ,
 "G799_L_C3" ,
@@ -6297,14 +6297,14 @@ sim.clust <- c("G885_L_C1",
 ```R
 #take out the clusters defined by cycling clusters described above
 
-remove.clust <- c("G885_L_C1", 
+remove.clust <- c("G885_L_C1",
 "G566_L_C2",
 "BT89_L_C1" ,
 "BT147_L_C1" ,
 "BT67_L_C1" ,
 "G620_L_C3" ,
 "G637_L_C3" ,
-"G946−K_L_C2", 
+"G946−K_L_C2",
 "G876_L_C2" ,
 "G800_L_C2" ,
 "G799_L_C3" ,
@@ -6376,11 +6376,11 @@ BTSC <- SetIdent(BTSC, ident.use = factor(BTSC@meta.data$IntraBTSC.ID))
 #
 pdf("Dotplot_BTSC_86cluster_MarkerGenes.pdf", height = 25, width = 5)
 
-DotPlot(BTSC, genes.plot = c("MKI67", "TOP2A", "ARHGAP11A", "BRCA1", "HMGB2"), 
-        dot.scale = 4, 
+DotPlot(BTSC, genes.plot = c("MKI67", "TOP2A", "ARHGAP11A", "BRCA1", "HMGB2"),
+        dot.scale = 4,
         plot.legend = T,
         cols.use = c("blue", "white", "red")
-        
+
        )
 
 dev.off()
@@ -6391,17 +6391,17 @@ dev.off()
 ```R
 ## make a heatmap on cluster averages
 
-cluster.averages <- AverageExpression(BTSC, 
-                                      return.seurat = TRUE 
- 
+cluster.averages <- AverageExpression(BTSC,
+                                      return.seurat = TRUE
+
                                     )
-genes <- c("MKI67", 
-           "TOP2A", 
-           "ARHGAP11A", 
-           "ARHGAP11B", 
-           "BRCA1", 
-           "HMGB2", 
-           "SOX10", 
+genes <- c("MKI67",
+           "TOP2A",
+           "ARHGAP11A",
+           "ARHGAP11B",
+           "BRCA1",
+           "HMGB2",
+           "SOX10",
            "EGFR",
            "CD44",
            "CD24",
@@ -6409,9 +6409,9 @@ genes <- c("MKI67",
           )
 
 pdf("Dotplot_BTSC_86cluster_MarkerGenes.pdf", width = 30)
-DoHeatmap(cluster.averages, 
+DoHeatmap(cluster.averages,
           genes.use = genes,
-          group.label.rot = TRUE, 
+          group.label.rot = TRUE,
           group.cex = 0
          )
 dev.off()
@@ -6429,7 +6429,7 @@ G837_L markers <- c("SOX10", "PLP1", "ALDH1A3", "COL5A2")
 G583_L CD24   
 G549_L ASCL1, PMP2,    
 
-Subject MM11 exhibited two transcriptional states, both expressing high levels of CCND1 and FRZB; one state was characterized by significant overexpression of endothelial differentiation related factor 1 (EDF1), involved in lipid metabolism and the PPARγ pathway35,36, while the second transcrip- tional clonotype overexpresses PCBD1, a transcriptional co-activator of HNF137. 
+Subject MM11 exhibited two transcriptional states, both expressing high levels of CCND1 and FRZB; one state was characterized by significant overexpression of endothelial differentiation related factor 1 (EDF1), involved in lipid metabolism and the PPARγ pathway35,36, while the second transcrip- tional clonotype overexpresses PCBD1, a transcriptional co-activator of HNF137.
 
 
 ```R
@@ -6447,7 +6447,7 @@ setwd("~/Desktop/Samwise/projects/BTSCs_scRNAseq/Manuscript_G607removed/CellCyle
 
 ```R
 sample <- "G837_L"
-markers <- 
+markers <-
 
 
 load.file <- list.files(pattern = "RData")[grep(sample, list.files(pattern = "RData"))]
@@ -6492,32 +6492,32 @@ library(RColorBrewer)
     Warning message:
     “package ‘cowplot’ was built under R version 3.4.4”
     Attaching package: ‘cowplot’
-    
+
     The following object is masked from ‘package:ggplot2’:
-    
+
         ggsave
-    
+
     Loading required package: Matrix
     Warning message:
     “package ‘Matrix’ was built under R version 3.4.4”
 
 
 ```R
-sim.clust <- c("G885_L_C1", 
+sim.clust <- c("G885_L_C1",
 "G566_L_C2",
 "BT89_L_C1" ,
 "BT147_L_C1" ,
 "BT67_L_C1" ,
 "G620_L_C3" ,
 "G637_L_C3" ,
-"G946−K_L_C2", 
+"G946−K_L_C2",
 "G876_L_C2" ,
 "G800_L_C2" ,
 "G799_L_C3" ,
 "G797_L_C3" ,
 "G620_L_C5" ,
 "BT84_L_C2"
-               
+
                )
 
 load("~/Desktop/Samwise/projects/BTSCs_scRNAseq/Manuscript_G607removed/CommonMarkerGenes_BTSCs/BTSC_intraClusterAverages.Rdata")
@@ -6616,7 +6616,7 @@ breaks[i] <- length(grep(samples[i], colnames(dat)))
 subset <- scale(t(subset))
 
 intrasample_z[[sample]] <- subset
-    
+
     }
 
 intrasample_z <- t(do.call(rbind, intrasample_z))
@@ -6698,9 +6698,9 @@ sum(breaks)
 col.breaks <- c()
 
 for(i in 1:length(breaks)){
-    
+
     col.breaks[i] <- sum(breaks[1:i])
-    
+
 }
 
 col.breaks
@@ -6740,7 +6740,7 @@ pheatmap(intrasample_z,
 ```
 
 ---
-## 9.0 Plot proliferation across all patients -- this looks shitty
+## 9.0 Plot proliferation across all patients
 ---
 
 
@@ -6778,7 +6778,7 @@ subset <- scale(t(subset))
 head(subset)
 
 intrasample_z[[sample]] <- subset
-    
+
     }
 
 intrasample_z <- do.call(rbind, intrasample_z)
