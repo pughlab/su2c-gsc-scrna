@@ -216,9 +216,9 @@ table(bb$Source)
 
 
 
-    
-                    Cahoy    InHouse     Neftel Nowakowski    Verhaak      Zhong 
-             0          6          2          3         15          3          3 
+
+                    Cahoy    InHouse     Neftel Nowakowski    Verhaak      Zhong
+             0          6          2          3         15          3          3
 
 
 
@@ -475,9 +475,9 @@ table(bb$Source)
 
 
 
-    
-                    Cahoy    InHouse     Neftel Nowakowski    Verhaak      Zhong 
-             0          1          1          4         10          2          2 
+
+                    Cahoy    InHouse     Neftel Nowakowski    Verhaak      Zhong
+             0          1          1          4         10          2          2
 
 
 
@@ -937,4 +937,3 @@ cat(c(colnames(pc1), colnames(pc2)), sep = "\n")
     Neftel_OPC_AUC.1
     Neftel_NPC1_AUC.1
     Neftel_NPC2_AUC
-
