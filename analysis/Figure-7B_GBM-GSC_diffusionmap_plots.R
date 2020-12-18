@@ -1,7 +1,7 @@
 ###############################################################################
 library(knitr)
 library(rmarkdown)
-source("laura_SU2C_GBM_GSCs_combined_explore_helpers.R")
+source("whitley_scRNA_helpers.R")
 data_dir <- '~/projects/su2c_v2/data/raw/scRNA/Data/laura_Diffusion_Map_July_2020/'
 tumour_gsc_dir <- file.path(data_dir, 'Tumour_GSCs')
 gsc_dir <- file.path(data_dir, 'GSCs')

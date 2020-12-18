@@ -1,7 +1,7 @@
 ###############################################################################
 library(Seurat)
 library(biomaRt)
-source('laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+source('whitley_scRNA_helpers.R')
 top_dir <- '~/projects/su2c_v2'
 raw_data_dir <- file.path(top_dir, 'data/raw/scRNA/Wang_2019_CancerDiscov')
 preproc_data_dir <- file.path(top_dir, 'data/preprocessed/scRNA/Wang_2019_CancerDiscov')
