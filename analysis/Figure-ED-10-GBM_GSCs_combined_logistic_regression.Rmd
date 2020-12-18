@@ -32,7 +32,7 @@ the classifier considers important, and see what genes are associated with said 
 ``` {r}
 suppressPackageStartupMessages({
   library(ComplexHeatmap)
-  source('./laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+  source('./whitley_scRNA_helpers.R')
 })
 for (i in 1:length(params)) {
   param.i <- names(params)[i]
