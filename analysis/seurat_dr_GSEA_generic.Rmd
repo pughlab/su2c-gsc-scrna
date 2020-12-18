@@ -1,0 +1,114 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+params:    
+  inp_data: '~/projects/su2c_v2/data/preprocessed/scRNA/Bhaduri_2020/bhaduri_2020_tumor_seurat_scored.rds'
+  dr_use: 'pca'
+  dims_use: 1
+  n_cores: 1
+  gmt_file: '~/projects/su2c_v2/data/raw/gmt_files/baderlab_gmts/Human_GO_AllPathways_no_GO_iea_April_01_2018_symbol.gmt'
+  output_dir: 'NULL'
+---
+
+
+
+```{r}
+library(Seurat)
+library(SummExpDR)
+library(foreach)
+library(doSNOW)
+library(snow)
+
+for (i in 1:length(params)) {
+  param.i <- names(params)[i]
+  assign(param.i, params[[i]])
+}
+
+if (is.character(inp_data)) {
+      # we only load data in from file for testing/debugging purposes.
+      # inp_data should generally be a Seurat object that is fully preprocessed 
+      # as outlined in 'seurat_pipeline' function in helper functions,
+      # with PCA calculated
+      if (file.exists(inp_data)) {
+        inp_data <- readRDS(inp_data)
+      } else {
+        stop('File for input data does not exist')
+      }
+}
+
+```
+
+## Run GSEA on Selected Dimension
+
+``` {r}
+## write files and run GSEA
+dr_key <- Seurat::GetDimReduction(inp_data, reduction.type = dr_use, slot = 'key')
+if (output_dir == 'NULL') {
+  output_dir <- paste0('./GSEA_results')
+}
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir)
+}
+dr_loadings <- Seurat::GetGeneLoadings(inp_data, reduction.type = dr_use, dims.use = dims_use)
+rm(inp_data)
+
+do_GSEA_1_dim <- function(i) {
+  exit_code <- 1
+  try({
+    # get loadings
+    gc(full = TRUE)
+    rnk_fpath <- file.path(output_dir, paste0(dr_key, i, '_loadings.rnk'))
+    dr_loadings_table <- data.frame(gene = rownames(dr_loadings), loading = dr_loadings[,i], row.names = NULL)
+    dr_loadings_table <- dr_loadings_table[order(dr_loadings_table$loading, decreasing = TRUE), ]
+    write.table(dr_loadings_table, file = rnk_fpath, sep = '\t', col.names = FALSE, row.names = FALSE, quote = FALSE)
+    # run GSEA
+    SummExpDR::enrich_GSEA(gsea_rank_list_path = rnk_fpath, 
+                          gsea_analysis_name = paste0(dr_key, i ,'_loadings'),
+                          gsea_rpt_label = 'report',
+                          gsea_out = output_dir,
+                          gsea_gmx = gmt_file,
+                          gsea_min_gs_size = 15, gsea_max_gs_size = 200)
+    exit_code <- 0
+  })
+  return(exit_code)
+}
+
+if (n_cores < 2) {
+  print('running in serial')
+  exit_codes <- c()
+  pb <- txtProgressBar(max = length(dims_use), style = 3)
+  for (i in 1:length(dims_use)) {
+    exit_codes <- c(exit_codes, do_GSEA_1_dim(dims_use[i]))
+  }
+} else {
+  print(paste('running in parallel with', n_cores, 'cores'))
+  cl <- snow::makeCluster(n_cores)
+  doSNOW::registerDoSNOW(cl)
+  pb <- txtProgressBar(max = length(dims_use), style = 3)
+  progress <- function(n) setTxtProgressBar(pb, n)
+  opts <- list(progress = progress)
+  `%dopar%` <- foreach::`%dopar%`
+  exit_codes <- foreach::foreach(i = 1:length(dims_use), 
+                                 .options.snow = opts, 
+                                 .combine = 'c',
+                                 .export = 'do_GSEA_1_dim') %dopar%
+    {
+      return(do_GSEA_1_dim(dims_use[i]))
+    }
+  snow::stopCluster(cl)
+}
+
+names(exit_codes) <- paste0(dr_key, dims_use)
+
+print(exit_codes)
+
+```
+
+
+## Session Info
+``` {r}
+Sys.time()
+sessionInfo()
+```
