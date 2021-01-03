@@ -3,7 +3,7 @@
 library(knitr)
 library(rmarkdown)
 library(Seurat)
-suppressPackageStartupMessages({source('laura_SU2C_GBM_GSCs_combined_explore_helpers.R')})
+suppressPackageStartupMessages({source('whitley_scRNA_helpers.R')})
 # setup
 html_output_dir <- 'reports/Neftel_2019'
 preproc_data_dir <- '~/projects/su2c_v2/data/preprocessed/scRNA/Neftel_2019_Filtered/'

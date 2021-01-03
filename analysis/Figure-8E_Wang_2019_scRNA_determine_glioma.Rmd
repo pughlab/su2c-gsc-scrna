@@ -17,7 +17,7 @@ params:
 ```{r}
 top_dir <- '~/projects/su2c_v2'
 gene_sets_dir <- file.path(top_dir, '/data/preprocessed/GeneSets')
-suppressPackageStartupMessages({source('laura_SU2C_GBM_GSCs_combined_explore_helpers.R')})
+suppressPackageStartupMessages({source('whitley_scRNA_helpers.R')})
 for (i in 1:length(params)) {
   param.i <- names(params)[i]
   assign(param.i, params[[i]])

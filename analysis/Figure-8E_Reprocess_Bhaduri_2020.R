@@ -1,6 +1,6 @@
 ###############################################################################
 ### Preprocess Bhaduri et al. 2020 data
-source('laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+source('whitley_scRNA_helpers.R')
 top_dir <- '~/projects/su2c_v2'
 data_dir <- file.path(top_dir, 'data')
 gene_sets_dir <- file.path(data_dir, 'preprocessed/GeneSets')

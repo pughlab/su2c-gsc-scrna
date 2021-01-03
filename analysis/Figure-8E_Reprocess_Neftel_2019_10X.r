@@ -1,6 +1,6 @@
 ###############################################################################
 ### Preprocess Neftel et al. 2019 data
-source('laura_SU2C_GBM_GSCs_combined_explore_helpers.R')
+source('whitley_scRNA_helpers.R')
 library(readxl)
 library(biomaRt)
 top_dir <- '~/projects/su2c_v2'
