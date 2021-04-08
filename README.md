@@ -1,7 +1,7 @@
 ## Gradient of developmental and injury-response transcriptional states define functional vulnerabilities underpinning glioblastoma heterogeneity
 
 
-This repository contains custom code used for analysis and plotting in  Richards, Whitley et al., *Nature Cancer* (2020).   
+This repository contains custom code used for analysis and plotting in  Richards, Whitley et al., *Nature Cancer* (2021).   
 DOI: [10.1038/s43018-020-00154-9](https://www.nature.com/articles/s43018-020-00154-9)  
 
 
